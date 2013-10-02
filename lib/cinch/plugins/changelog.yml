@@ -1,0 +1,10 @@
+- date: "2013-09-30"
+  changes:
+    - "Added thief output for endgame"
+    - "Added seer output for endgame"
+    - "Adjusted status command"
+    - "Fixed invalid thief/seer/lynch targets"
+- date: "2013-09-25"
+  changes:
+    - "initial"
+
