@@ -507,30 +507,13 @@ module Cinch
         end.join(', ')
         Channel(@channel_name).send "Final Votes: #{lynch_msg}"
 
-        # following is funky, surely there's a better ruby method for this
-
-        # # the first item in lynch total should be max
-        # first_lynch = lynch_totals.shift
-        # lynching << first_lynch
-
-        # # now get size, and see if the next one is a tie, lynch them also if so
-        # while lynch_totals.first.size == first_lynch.size do 
-        #    lynching << lynch_totals.shift
-        # end 
-
-        # Channel(@channel_name).send "You are lynching: #{lynching.join(' and ')} ..."
-        # sleep 1
-        # lynching.each do |lynch, votes|
-        #   Channel(@channel_name).send "#{lynch} is a #{lynch.role.upcase}"
-        #   sleep 1
-        # end
-
         # now reveal roles of everyone
         roles_msg = @game.players.map do |player|
           "#{player} - #{player.role.upcase}"
         end.join(', ')
         Channel(@channel_name).send "Starting Roles: #{roles_msg}"
 
+        #now reveal seer and thief actions
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.seer_view.has_key?(:player)
@@ -556,9 +539,12 @@ module Cinch
           player.role = player.new_role unless player.new_role.nil?
         end
 
+        #grab the first person lynched and see if anyone else matches them
         first_lynch = lynch_totals.first
         lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
         lynching = lynching.map{ |voted, voters| voted}
+
+        #return victory result
         if (lynching.detect { |l| l.werewolf? } && first_lynch[1].count > 1) || (!lynching.detect { |l| l.werewolf? } && first_lynch[1].count == 1)
           Channel(@channel_name).send "Humans WIN! Team: #{@game.humans.join(', ')}"
         elsif @game.werewolves.empty?
@@ -566,8 +552,6 @@ module Cinch
         else
           Channel(@channel_name).send "Werewolves WIN! Team: #{@game.werewolves.join(', ')}"
         end
-
-        #Channel(@channel_name).send "SIZE: #{first_lynch[1].count} FIRST: #{first_lynch} TEST: #{lynching}"
 
         self.start_new_game
       end
