@@ -1,3 +1,9 @@
+- date: "2013-10-02"
+  changes:
+    - "Fixed victory output if no werewolves in play and villager is lynched"
+- date: "2013-10-01"
+  changes:
+    - "Added victory condition output"
 - date: "2013-09-30"
   changes:
     - "Added thief output for endgame"

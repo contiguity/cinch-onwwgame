@@ -12,7 +12,7 @@ class Game
   MIN_PLAYERS = 3
   MAX_PLAYERS = 6
   BASE_ROLES = [
-      :villager, :villager, :seer, :thief, :villager
+      :werewolf, :werewolf, :seer, :thief, :villager
     ]
 
   attr_accessor :started, :phase, :players, :player_cards, :table_cards, :lynch_votes, :invitation_sent
