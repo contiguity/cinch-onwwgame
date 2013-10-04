@@ -144,6 +144,16 @@ class Game
     self.not_voted.size == 0
   end
 
+  def not_confirmed
+    all_players = self.players
+    not_confirmed_players = all_players.select{ |player| !player.confirmed? && player.non_special? }
+    not_confirmed_players
+  end
+
+  def all_roles_confirmed?
+    self.not_confirmed.size == 0
+  end
+
   def lynch_totals
     totals = {}
     self.lynch_votes.each do |voter, voted|
@@ -181,6 +191,10 @@ class Game
     thief && thief.thief_take.nil?
   end
 
+  def waiting_on_role_confirm
+    !self.all_roles_confirmed?
+  end
+
   def change_to_day
     self.phase = :day
   end
@@ -213,6 +227,10 @@ class Game
     self.players.select{ |p| p.good? }
   end
 
+  def non_special
+    self.players.select{ |p| p.villager? || p.werewolf? }
+  end
+
 end
 
 #================================================================================
@@ -221,7 +239,7 @@ end
 
 class Player
 
-  attr_accessor :user, :role, :new_role, :thief_take, :seer_view
+  attr_accessor :user, :role, :new_role, :thief_take, :seer_view, :confirm
 
   def initialize(user)
     self.user = user
@@ -229,10 +247,15 @@ class Player
     self.new_role = nil
     self.seer_view = nil
     self.thief_take = nil
+    self.confirm = false
   end 
 
   def receive_role(role)
     self.role = role
+  end
+
+  def confirm_role
+    self.confirm = true
   end
 
   def to_s
@@ -263,6 +286,13 @@ class Player
     self.werewolf?
   end
 
+  def non_special?
+    self.werewolf? || self.villager?
+  end
+
+  def confirmed?
+    self.confirm == true
+  end
 
 end
 

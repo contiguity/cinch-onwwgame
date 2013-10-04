@@ -44,7 +44,7 @@ module Cinch
  
       match /lynch (.+)/i,        :method => :lynch_vote
       match /status/i,            :method => :status
-
+      match /confirm/i,           :method => :confirm_role
 
       # other
       # match /invite/i,              :method => :invite
@@ -124,6 +124,7 @@ module Cinch
           # else
             User(m.user).send "--- HELP PAGE 1/3 ---"
             User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
+            User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
@@ -321,7 +322,7 @@ module Cinch
 
         # first see if we need to wait, if we do, just wait
         # if not, artificially wait
-        if @game.waiting_on_seer_view || @game.waiting_on_thief_take
+        if @game.waiting_on_seer_view || @game.waiting_on_thief_take || @game.waiting_on_role_confirm
           # wait
         else
           self.start_day_artifically
@@ -346,7 +347,7 @@ module Cinch
       end
 
       def check_for_day_phase
-        if @game.waiting_on_seer_view || @game.waiting_on_thief_take
+        if @game.waiting_on_seer_view || @game.waiting_on_thief_take || @game.waiting_on_role_confirm
 
         else
           self.start_day_phase
@@ -371,6 +372,23 @@ module Cinch
       def check_for_lynch
         if @game.all_lynch_votes_in?
           self.do_end_game
+        end
+      end
+
+      def confirm_role(m)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          if player.non_special?
+            player.confirm_role
+            User(m.user).send "Your role has been confirmed"
+            self.check_for_day_phase
+          end
+        end
+      end
+
+      def check_for_confirm
+        if @game.all_roles_confirmed?
+
         end
       end
 
@@ -483,7 +501,7 @@ module Cinch
       def tell_role_to(player)
         case player.role
         when :villager
-          loyalty_msg = "You are a VILLAGER."
+          loyalty_msg = "You are a VILLAGER. Type !confirm to confirm your role."
         when :seer
           loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
         when :thief
@@ -491,7 +509,7 @@ module Cinch
         when :werewolf
           other_wolf = @game.werewolves.reject{ |w| w == player }
           msg = other_wolf.empty? ? "You are a lone wolf." : "The other wolf is #{other_wolf.first}."
-          loyalty_msg = "You are a WEREWOLF. #{msg}"
+          loyalty_msg = "You are a WEREWOLF. #{msg} Type !confirm to confirm your role."
         end
         User(player.user).send loyalty_msg
       end
