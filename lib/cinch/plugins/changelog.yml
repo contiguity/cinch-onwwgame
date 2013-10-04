@@ -2,6 +2,7 @@
   changes:
     - "Fixed leave bug when at max players"
     - "Now require villagers and werewolves to confirm role"
+    - "Reword ties in rules"
 - date: "2013-10-02"
   changes:
     - "Fixed victory output if no werewolves in play and villager is lynched"
