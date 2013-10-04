@@ -272,7 +272,7 @@ module Cinch
       end
 
       def leave(m)
-        if @game.accepting_players?
+        if @game.not_started?
           left = @game.remove_player(m.user)
           unless left.nil?
             Channel(@channel_name).send "#{m.user.nick} has left the game (#{@game.players.count}/#{Game::MAX_PLAYERS})"
