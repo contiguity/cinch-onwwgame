@@ -386,12 +386,6 @@ module Cinch
         end
       end
 
-      def check_for_confirm
-        if @game.all_roles_confirmed?
-
-        end
-      end
-
       def status(m)
         m.reply @game.check_game_state
       end
