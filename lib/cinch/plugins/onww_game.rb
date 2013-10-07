@@ -519,6 +519,14 @@ module Cinch
         end.join(', ')
         Channel(@channel_name).send "Final Votes: #{lynch_msg}"
 
+        #grab the first person lynched and see if anyone else matches them
+        first_lynch = lynch_totals.first
+        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
+        lynching = lynching.map{ |voted, voters| voted}
+        
+        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : lynching.join(', ')
+        Channel(@channel_name).send "Lynched players: #{lynched_players}"
+
         # now reveal roles of everyone
         roles_msg = @game.players.map do |player|
           "#{player} - #{player.role.upcase}"
@@ -550,11 +558,6 @@ module Cinch
         @game.players.map do |player|
           player.role = player.new_role unless player.new_role.nil?
         end
-
-        #grab the first person lynched and see if anyone else matches them
-        first_lynch = lynch_totals.first
-        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
-        lynching = lynching.map{ |voted, voters| voted}
 
         #return victory result
         if (lynching.detect { |l| l.werewolf? } && first_lynch[1].count > 1) || (!lynching.detect { |l| l.werewolf? } && first_lynch[1].count == 1)
