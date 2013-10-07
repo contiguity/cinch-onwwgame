@@ -146,7 +146,7 @@ class Game
 
   def not_confirmed
     all_players = self.players
-    not_confirmed_players = all_players.select{ |player| !player.confirmed? && player.non_special? }
+    not_confirmed_players = all_players.select{ |player| !player.confirmed? }
     not_confirmed_players
   end
 
@@ -178,18 +178,6 @@ class Game
   end
 
   # GAME STATE
-
-  def waiting_on_seer_view
-    seer = self.find_player_by_role(:seer)
-    
-    seer && seer.seer_view.nil?
-  end
-
-  def waiting_on_thief_take
-    thief = self.find_player_by_role(:thief)
-    
-    thief && thief.thief_take.nil?
-  end
 
   def waiting_on_role_confirm
     !self.all_roles_confirmed?

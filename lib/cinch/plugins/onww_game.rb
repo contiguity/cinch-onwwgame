@@ -322,7 +322,7 @@ module Cinch
 
         # first see if we need to wait, if we do, just wait
         # if not, artificially wait
-        if @game.waiting_on_seer_view || @game.waiting_on_thief_take || @game.waiting_on_role_confirm
+        if @game.waiting_on_role_confirm
           # wait
         else
           self.start_day_artifically
@@ -347,7 +347,7 @@ module Cinch
       end
 
       def check_for_day_phase
-        if @game.waiting_on_seer_view || @game.waiting_on_thief_take || @game.waiting_on_role_confirm
+        if @game.waiting_on_role_confirm
 
         else
           self.start_day_phase
@@ -391,7 +391,7 @@ module Cinch
       end
 
       def seer_view_player(m, view)
-        if @game.started? && @game.waiting_on_seer_view && @game.has_player?(m.user)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
           if player.seer?
@@ -402,6 +402,7 @@ module Cinch
               User(m.user).send "You cannot view yourself."
             else
               player.seer_view = {:player => target_player}
+              player.confirm_role
               User(m.user).send "#{target_player} is #{target_player.role.upcase}."
               self.check_for_day_phase
             end
@@ -412,11 +413,12 @@ module Cinch
       end
 
       def seer_view_table(m)
-        if @game.started? && @game.waiting_on_seer_view && @game.has_player?(m.user)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
           if player.seer?
             player.seer_view = {:table => @game.table_cards.map(&:upcase).join(" and ")}
+            player.confirm_role
             User(m.user).send "Middle is #{@game.table_cards.map(&:upcase).join(" and ")}."
             self.check_for_day_phase
           else 
@@ -426,7 +428,7 @@ module Cinch
       end
 
       def thief_take_player(m, stolen)
-        if @game.started? && @game.waiting_on_thief_take && @game.has_player?(m.user)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
           if player.thief?
@@ -438,6 +440,7 @@ module Cinch
             else
               player.thief_take = {:player => target_player}
               player.new_role = target_player.role
+              player.confirm_role
               target_player.new_role = :thief
               User(m.user).send "You are now a #{target_player.role.upcase}."
               self.check_for_day_phase
@@ -449,11 +452,12 @@ module Cinch
       end
 
       def thief_take_none(m)
-        if @game.started? && @game.waiting_on_thief_take && @game.has_player?(m.user)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
           if player.thief?
             player.thief_take = {:none => "none"}
+            player.confirm_role
             User(m.user).send "You remain THIEF."
             self.check_for_day_phase
           else 
@@ -463,13 +467,14 @@ module Cinch
       end
 
       def thief_take_table(m)
-        if @game.started? && @game.waiting_on_thief_take && @game.has_player?(m.user)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
       
           if player.thief?
             new_thief = @game.table_cards.shuffle.first
             player.thief_take = {:table => new_thief}
             player.new_role = new_thief
+            player.confirm_role
             User(m.user).send "You are now a #{new_thief.upcase}."
             self.check_for_day_phase
           else 
