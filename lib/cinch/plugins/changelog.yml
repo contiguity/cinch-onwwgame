@@ -1,6 +1,7 @@
 - date: "2013-10-07"
   changes:
     - "Added output to show who was lynched"
+    - "Added clarification for werewolf reveal in rules"
 - date: "2013-10-04"
   changes:
     - "Fixed leave bug when at max players"
