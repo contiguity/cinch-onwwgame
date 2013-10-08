@@ -685,7 +685,14 @@ module Cinch
             if @game.has_player?(m.user)
               User(m.user).send "You are in the game, goof!"
             else
-              # SHOW ROLES
+              roles_msg = @game.players.map do |player|
+                "#{player} - #{player.role.upcase}"
+              end.join(', ')
+              User(m.user).send "Starting Roles: #{roles_msg}"
+              if @game.day?
+                roles_msg = @game.players.map{ |player| player.new_role.nil? ? "#{player} - #{player.role.upcase}" : Format(:bold, "#{player} - #{player.new_role.upcase}")}.join(', ')
+                User(m.user).send "Current Roles: #{roles_msg}"
+              end
             end
           else
             User(m.user).send "There is no game going on."
