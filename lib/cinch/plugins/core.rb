@@ -165,8 +165,10 @@ class Game
 
 
   def check_game_state
-    if self.started?
+    if self.started? && self.day?
       status = "Waiting on players to vote: #{self.not_voted.map(&:user).join(", ")}"
+    elsif self.started? && self.night?
+      status = "Waiting on players to confirm role: #{self.not_confirmed.map(&:user).join(", ")}"
     else
       if self.player_count.zero?
         status = "No game in progress."
@@ -189,6 +191,10 @@ class Game
 
   def day?
     self.phase == :day
+  end
+
+  def night?
+    self.phase == :night
   end
 
   #----------------------------------------------

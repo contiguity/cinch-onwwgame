@@ -2,6 +2,8 @@
   changes:
     - "Added output to show who was lynched"
     - "Added clarification for werewolf reveal in rules"
+    - "Removed waiting on seer/thief and moved to role_confirm"
+    - "Added night status for role confirm"
 - date: "2013-10-04"
   changes:
     - "Fixed leave bug when at max players"
