@@ -1,3 +1,6 @@
+- date: "2013-10-15"
+  changes:
+    - "Added seer output to roles output"
 - date: "2013-10-08"
   changes:
     - "Fixed roles output"

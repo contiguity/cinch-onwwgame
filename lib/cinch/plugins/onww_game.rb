@@ -692,6 +692,14 @@ module Cinch
               if @game.day?
                 roles_msg = @game.players.map{ |player| player.new_role.nil? ? "#{player} - #{player.role.upcase}" : Format(:bold, "#{player} - #{player.new_role.upcase}")}.join(', ')
                 User(m.user).send "Current Roles: #{roles_msg}"
+                player = @game.find_player_by_role(:seer)
+                unless player.nil?
+                  if player.seer_view.has_key?(:player)
+                    User(m.user).send "Seer looked at #{player.seer_view[:player]} and saw: #{player.seer_view[:player].role.upcase}"
+                  elsif player.seer_view.has_key?(:table)
+                    User(m.user).send "Seer looked at the table and saw: #{player.seer_view[:table]}"
+                  end
+                end
               end
             end
           else
