@@ -53,6 +53,9 @@ module Cinch
       match /help ?(.+)?/i,         :method => :help
       match /intro/i,               :method => :intro
       match /rules ?(.+)?/i,        :method => :rules
+      match /settings$/i,           :method => :get_game_settings
+      match /settings (base|onuww) ?(.+)?/i, :method => :set_game_settings
+
       match /changelog$/i,          :method => :changelog_dir
       match /changelog (\d+)/i,     :method => :changelog
       # match /about/i,               :method => :about
@@ -712,7 +715,53 @@ module Cinch
       #--------------------------------------------------------------------------------
       # Settings
       #--------------------------------------------------------------------------------
-      
+     
+      def get_game_settings(m)
+        if @game.onuww?
+          m.reply "Game settings: ONUWW. Using roles: #{self.game_settings[:roles].join(", ")}."
+        else
+          m.reply "Game settings: base."
+        end
+      end
+
+      def set_game_settings(m, game_type, game_options = "")
+        # this is really really wonky =(
+        unless @game.started?
+          game_change_prefix = m.channel.nil? ? "#{m.user.nick} has changed the game" : "The game has been changed"
+          options = game_options || ""
+          options = options.downcase.split(" ")
+          if game_type.downcase == "onuww" && game_options == ""
+            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppleganger"]
+            role_options = options.select{ |opt| valid_role_options.include?(opt) }
+            roles = role_options
+
+            @game.change_type :onuww, :roles => roles
+            game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
+          elsif game_type.downcase == "onuww"
+            roles = []
+            roles += ["werewolf", "seer", "robber", "troublemaker", "villager"]
+            @game.change_type :onuww, :roles => roles
+            game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
+          else
+            @game.change_type :base
+            game_type_message = "#{game_change_prefix} to base."
+          end
+          Channel(@channel_name).send "#{game_type_message}"
+        end
+      end
+
+      def game_settings
+        settings = {}
+        settings[:roles] = @game.roles
+
+        if @game.onuww?
+          #do stuff
+        else
+          #do other stuff
+        end
+        settings
+      end
+
       def save_settings(settings)
         output = File.new(@settings_file, 'w')
         output.puts YAML.dump(settings)

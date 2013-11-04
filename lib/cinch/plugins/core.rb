@@ -15,11 +15,13 @@ class Game
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
 
-  attr_accessor :started, :phase, :players, :player_cards, :table_cards, :lynch_votes, :invitation_sent
+  attr_accessor :started, :phase, :players, :type, :roles, :player_cards, :table_cards, :lynch_votes, :invitation_sent
   
   def initialize
     self.started         = false
     self.players         = []
+    self.type            = :base
+    self.roles           = []
     self.invitation_sent = false
     self.player_cards    = []
     self.table_cards     = []
@@ -83,6 +85,22 @@ class Game
     removed
   end
 
+  def change_type(type, options = {})
+    self.type = type
+    if type == :onuww
+      self.roles = options[:roles].map(&:to_sym)
+    else
+      self.roles = []
+    end
+  end
+
+  def onuww?
+    self.type == :onuww
+  end
+
+  def with_role?(role)
+    self.roles.include?(role)
+  end
 
   # Invitation handlers
 
@@ -273,11 +291,11 @@ class Player
   end
 
   def good?
-    self.seer? || self.thief? || self.villager?
+    [:seer, :thief, :villager, :robber, :troublemaker, :tanner, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
   end
 
   def evil?
-    self.werewolf?
+    [:werewolf, :minion].any?{ |role| role == self.role} 
   end
 
   def non_special?
@@ -288,6 +306,9 @@ class Player
     self.confirm == true
   end
 
+  def role?(role)
+    self.role == role
+  end
 end
 
 
