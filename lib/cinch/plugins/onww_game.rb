@@ -258,7 +258,7 @@ module Cinch
           if @game.accepting_players? 
             added = @game.add_player(m.user)
             unless added.nil?
-              Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/#{Game::MAX_PLAYERS})"
+              Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/#{@game.max_players})"
               Channel(@channel_name).voice(m.user)
             end
           else
@@ -279,7 +279,7 @@ module Cinch
         if @game.not_started?
           left = @game.remove_player(m.user)
           unless left.nil?
-            Channel(@channel_name).send "#{m.user.nick} has left the game (#{@game.players.count}/#{Game::MAX_PLAYERS})"
+            Channel(@channel_name).send "#{m.user.nick} has left the game (#{@game.players.count}/#{@game.max_players})"
             Channel(@channel_name).devoice(m.user)
           end
         else
@@ -599,7 +599,7 @@ module Cinch
         if @game.not_started?
           left = @game.remove_player(user)
           unless left.nil?
-            Channel(@channel_name).send "#{user.nick} has left the game (#{@game.players.count}/#{Game::MAX_PLAYERS})"
+            Channel(@channel_name).send "#{user.nick} has left the game (#{@game.players.count}/#{@game.max_players})"
             Channel(@channel_name).devoice(user)
           end
         end
@@ -639,7 +639,7 @@ module Cinch
             user = User(nick)
             left = @game.remove_player(user)
             unless left.nil?
-              Channel(@channel_name).send "#{user.nick} has left the game (#{@game.players.count}/#{Game::MAX_PLAYERS})"
+              Channel(@channel_name).send "#{user.nick} has left the game (#{@game.players.count}/#{@game.max_players})"
               Channel(@channel_name).devoice(user)
             end
           else
@@ -730,18 +730,26 @@ module Cinch
           game_change_prefix = m.channel.nil? ? "#{m.user.nick} has changed the game" : "The game has been changed"
           options = game_options || ""
           options = options.downcase.split(" ")
-          if game_type.downcase == "onuww" && game_options == ""
-            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppleganger"]
+          if game_type.downcase == "onuww"
+            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger"]
             role_options = options.select{ |opt| valid_role_options.include?(opt) }
-            roles = role_options
-
-            @game.change_type :onuww, :roles => roles
-            game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
-          elsif game_type.downcase == "onuww"
-            roles = []
-            roles += ["werewolf", "seer", "robber", "troublemaker", "villager"]
-            @game.change_type :onuww, :roles => roles
-            game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
+	    if !game_options.nil?
+              roles = role_options
+              valid_role_options.map{ |vr|
+                if (vr == "werewolf" && (roles.grep(vr).length > 2 || roles.grep(vr).length== 0)) || (vr == "villager" && roles.grep(vr).length > 3)  || (vr !="werewolf" && vr != "villager" && roles.grep(vr).length > 1)
+                  roles = nil
+                  break
+                end
+              }
+            else
+              roles = ["werewolf", "seer", "robber", "troublemaker", "villager"]
+            end
+            unless roles.nil?
+              @game.change_type :onuww, :roles => roles
+              game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
+            else
+              game_type_message = "You have specified an invalid number of roles"
+            end
           else
             @game.change_type :base
             game_type_message = "#{game_change_prefix} to base."

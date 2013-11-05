@@ -11,6 +11,8 @@ class Game
 
   MIN_PLAYERS = 3
   MAX_PLAYERS = 6
+  ONUWW_MAX_PLAYERS = 10
+
   BASE_ROLES = [
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
@@ -52,8 +54,20 @@ class Game
 
   # Player handlers
 
+  def max_players
+    if onuww?
+      ONUWW_MAX_PLAYERS
+    else
+      MAX_PLAYERS
+    end
+  end
+
   def at_max_players?
-    self.player_count == MAX_PLAYERS
+    if onuww?
+      self.player_count == ONUWW_MAX_PLAYERS
+    else
+      self.player_count == MAX_PLAYERS
+    end
   end
 
   def at_min_players?
@@ -89,8 +103,10 @@ class Game
     self.type = type
     if type == :onuww
       self.roles = options[:roles].map(&:to_sym)
+      max_players = 10
     else
       self.roles = []
+      max_players = 6
     end
   end
 
