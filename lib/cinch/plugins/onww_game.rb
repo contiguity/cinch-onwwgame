@@ -31,7 +31,7 @@ module Cinch
       # start
       match /join/i,             :method => :join
       match /leave/i,            :method => :leave
-      match /start/i,            :method => :start_game
+      match /start/i,            :method => :start_game_check
 
       # game
       #match /whoami/i,           :method => :whoami
@@ -289,16 +289,33 @@ module Cinch
         end
       end
 
-      def start_game(m)
+      def start_game_check(m)
         unless @game.started?
           if @game.at_min_players?
             if @game.has_player?(m.user)
-              @idle_timer.stop
-              @game.start_game!
-
-              Channel(@channel_name).send "The game has started."
-
-              self.start_night_phase
+              if @game.onuww?
+                #check to make sure we have the right number of roles
+                num_total_cards = @game.player_count + 3
+                if self.game_settings[:roles].count < num_total_cards
+                  num_lacking_cards = num_total_cards - self.game_settings[:roles].count
+                  if num_lacking_cards <= (3 - self.game_settings[:roles].count(:villager))
+                    num_lacking_cards.times {
+                      roles = self.game_settings[:roles]
+                      roles += ["villager"]
+                      @game.change_type :onuww, :roles => roles
+                    }
+                    self.do_start_game
+                  else
+                    Channel(@channel_name).send "Not enough roles specified for number of players."
+                  end
+                elsif self.game_settings[:roles].count > num_total_cards
+                  Channel(@channel_name).send "More roles specified than number of players."
+                else
+                 self.do_start_game 
+                end
+              else
+                self.do_start_game
+              end
             else
               m.reply "You are not in the game.", true
             end
@@ -308,7 +325,14 @@ module Cinch
         end
       end
 
+      def do_start_game
+        @idle_timer.stop
+        @game.start_game!
 
+        Channel(@channel_name).send "The game has started."
+
+        self.start_night_phase
+      end
 
       #--------------------------------------------------------------------------------
       # Game interaction methods
@@ -718,7 +742,7 @@ module Cinch
      
       def get_game_settings(m)
         if @game.onuww?
-          m.reply "Game settings: ONUWW. Using roles: #{self.game_settings[:roles].join(", ")}."
+          m.reply "Game settings: ONUWW. Using roles: #{self.game_settings[:roles].sort.join(", ")}."
         else
           m.reply "Game settings: base."
         end
@@ -726,29 +750,42 @@ module Cinch
 
       def set_game_settings(m, game_type, game_options = "")
         # this is really really wonky =(
+        # lots of stupid user checking
+        # im sure theres a better way but im lazy
         unless @game.started?
           game_change_prefix = m.channel.nil? ? "#{m.user.nick} has changed the game" : "The game has been changed"
           options = game_options || ""
           options = options.downcase.split(" ")
           if game_type.downcase == "onuww"
-            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger"]
+            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "masons"]
             role_options = options.select{ |opt| valid_role_options.include?(opt) }
-	    if !game_options.nil?
+            if role_options.include?("masons")
+              role_options -= ["masons"]
+              role_options += ["mason"]
+            end
+            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) }
+            if !game_options.nil?
               roles = role_options
               valid_role_options.map{ |vr|
-                if (vr == "werewolf" && (roles.grep(vr).length > 2 || roles.grep(vr).length== 0)) || (vr == "villager" && roles.grep(vr).length > 3)  || (vr !="werewolf" && vr != "villager" && roles.grep(vr).length > 1)
-                  roles = nil
-                  break
+                if (vr == "werewolf" && !roles.include?("werewolf"))
+                  role_options = nil
+                  Channel(@channel_name).send "You must include at least one werewolf."
+                elsif (vr !="werewolf" && vr != "villager" && vr != "mason" && roles.count(vr) > 1) || (vr == "werewolf" && (roles.count(vr) > 2)) || (vr == "villager" && roles.count(vr) > 3) || (vr == "mason" && roles.count("mason") > 2)
+                  role_options = nil
+                  Channel(@channel_name).send "You have included #{vr} too many times."
                 end
+                
               }
+              if unknown_options.count > 0
+                Channel(@channel_name).send "Unknown roles specified: #{unknown_options.join(", ")}."
+              end
             else
               roles = ["werewolf", "seer", "robber", "troublemaker", "villager"]
             end
-            unless roles.nil?
+            unless role_options.nil?
+              roles += ["mason"] if (roles.include?("mason") && roles.count("mason") == 1)
               @game.change_type :onuww, :roles => roles
-              game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].join(", ")}."
-            else
-              game_type_message = "You have specified an invalid number of roles"
+              game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].sort.join(", ")}."
             end
           else
             @game.change_type :base

@@ -1,3 +1,12 @@
+- date: "2013-11-07"
+  changes:
+    - "Lots of stupid user checking"
+- date: "2013-11-05"
+  changes:
+    - "Fix max players and check card numbers"
+- date: "2013-11-04"
+  changes:
+    - "Initial ONUWW settings commit"
 - date: "2013-10-15"
   changes:
     - "Added seer output to roles output"

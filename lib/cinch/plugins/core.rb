@@ -55,7 +55,7 @@ class Game
   # Player handlers
 
   def max_players
-    if onuww?
+    if self.onuww?
       ONUWW_MAX_PLAYERS
     else
       MAX_PLAYERS
@@ -63,7 +63,7 @@ class Game
   end
 
   def at_max_players?
-    if onuww?
+    if self.onuww?
       self.player_count == ONUWW_MAX_PLAYERS
     else
       self.player_count == MAX_PLAYERS
@@ -149,8 +149,10 @@ class Game
   #
   def pass_out_roles
     # assign loyalties
-    extra_players = self.player_count - MIN_PLAYERS
-    roles = BASE_ROLES + [:villager]*extra_players
+    unless self.onuww?
+      extra_players = self.player_count - MIN_PLAYERS
+      roles = BASE_ROLES + [:villager]*extra_players
+    end
     roles.shuffle!
     self.players.each do |player|
       role = roles.shift
