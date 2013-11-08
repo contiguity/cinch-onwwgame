@@ -34,14 +34,25 @@ module Cinch
       match /start/i,            :method => :start_game_check
 
       # game
-      #match /whoami/i,           :method => :whoami
+      #match /whoami/i,           :method => :whoami 
 
+      # seer
       match /view (.+)/i,         :method => :seer_view_player
       match /tableview/i,         :method => :seer_view_table
+
+      # thief
       match /thief (.+)/i,        :method => :thief_take_player
       match /tablethief/i,        :method => :thief_take_table
       match /nothief/i,           :method => :thief_take_none
- 
+
+      # robber
+      match /rob (.+)/i,          :method => :thief_take_player
+      match /norob/i,             :method => :thief_take_none
+
+      # troublemaker
+      match /switch ?(.+)?/i,     :method => :troublemaker_switch
+      match /noswitch/i,          :method => :troublemaker_noswitch
+
       match /lynch (.+)/i,        :method => :lynch_vote
       match /status/i,            :method => :status
       match /confirm/i,           :method => :confirm_role
@@ -131,7 +142,7 @@ module Cinch
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
-            User(m.user).send "!rules (rolecount) - provides rules for the game; when provided with an argument, provides specified rules"
+            User(m.user).send "!rules (rolecount|onuwwroles) - provides rules for the game; when provided with an argument, provides specified rules"
           # end
         end
       end
@@ -148,6 +159,8 @@ module Cinch
           User(m.user).send "4 players: 2 werewolves, 2 villagers, 1 seer, 1 thief"
           User(m.user).send "5 players: 2 werewolves, 3 villagers, 1 seer, 1 thief"
           User(m.user).send "6~7 players: 2 werewolves, 4 villagers, 1 seer, 1 thief"
+        when "onuwwroles"
+          User(m.user).send "INSERT ONUWW ROLES HERE!"
         else  
           User(m.user).send "One Night Werewolf is based on the party game \"Are you a werewolf?\'. In One Night Werewolf, there is a single night phase and a single day phase.  Just as in Werewolf, players are dealt roles which are kept hidden for the duration of the game.  There are always two more roles than the number of players.  During the night phase, the seer and thief (if in play) can use their abilities in order."
           User(m.user).send "First, the werewolves reveal to each other, or learn that they are the only one currently in play.  Next, the seer can either look at ONE player's role or look at the two remaining roles on the table. Finally, the thief can then choose to either exchange roles with another player, exchange roles with one of the remaining roles from the table, or not at all.  If the thief exchanges with another player, the chosen player does not know if their role was exchanged or not."
@@ -349,11 +362,11 @@ module Cinch
 
         # first see if we need to wait, if we do, just wait
         # if not, artificially wait
-        if @game.waiting_on_role_confirm
-          # wait
-        else
-          self.start_day_artifically
-        end
+        #if @game.waiting_on_role_confirm
+        #  # wait
+        #else
+        #  self.start_day_artifically
+        #end
 
       end
 
@@ -366,18 +379,27 @@ module Cinch
         end
       end
 
+      def start_night_phase2
+        @game.finish_subphase1
+        #loop through players and reveal information
+        @game.players.each do |p|
+          self.tell_reveal_to(p)
+        end
 
-      def start_day_artifically
-        # no timer for now, but will be a random timer after we notice
-        # how long it takes players usually
         self.start_day_phase
       end
+
+      #def start_day_artifically
+      #  # no timer for now, but will be a random timer after we notice
+      #  # how long it takes players usually
+      #  self.start_day_phase
+      #end
 
       def check_for_day_phase
         if @game.waiting_on_role_confirm
 
         else
-          self.start_day_phase
+          self.start_night_phase2
         end
       end
 
@@ -526,18 +548,77 @@ module Cinch
       
       def tell_role_to(player)
         case player.role
-        when :villager
+        when :villager,
           loyalty_msg = "You are a VILLAGER. Type !confirm to confirm your role."
         when :seer
           loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
         when :thief
           loyalty_msg = "You are the THIEF. Do you want to take a role? \"!thief [player]\", \"!tablethief\" or \"!nothief\""
-        when :werewolf
-          other_wolf = @game.werewolves.reject{ |w| w == player }
-          msg = other_wolf.empty? ? "You are a lone wolf." : "The other wolf is #{other_wolf.first}."
-          loyalty_msg = "You are a WEREWOLF. #{msg} Type !confirm to confirm your role."
+        when :robber
+          loyalty_msg = "You are the ROBBER. Do you want to take a role? \"!rob [player]\" or \"!norob\""
+        when :troublemaker
+          loyalty_msg = "You are the TROUBLEMAKER. Do you want to switch the roles of two players? \"!switch [player1] [player2]\" or \"!noswitch\""
+        when :tanner, :drunk, :hunter, :insomniac, :mason, :minion, :werewolf
+          loyalty_msg = "You are the #{player.role.upcase}. Type !confirm to confirm your role."
+        when :doppelganger
+          loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player\""
+        #when :mason
+        #  other_mason = @game.masons.reject{ |m| m == player }
+        #  msg = other_mason.empty? ? "You are the only mason." : "The other mason is #{other mason.first}."
+        #  loyalty_msg = "You are a MASON. #{msg} Type !confirm to confirm your role."
+        #when :minion
+        #  werewolves = @game.werewolves
+        #  msg = werewolves.empty? ? "You do not see any werewolves." : "You see 
+        #  loyalty_msg = "You are the MINION. #{msg}
+        #when :werewolf
+        #  other_wolf = @game.werewolves.reject{ |w| w == player }
+        #  msg = other_wolf.empty? ? "You are a lone wolf." : "The other wolf is #{other_wolf.first}."
+        #  loyalty_msg = "You are a WEREWOLF. #{msg} Type !confirm to confirm your role."
         end
         User(player.user).send loyalty_msg
+      end
+
+      def tell_reveal_to(player)
+        case player.role
+        when :seer
+          if player.seer_view.has_key?(:player)
+            reveal_msg = "#{player.seer_view[:player]} is #{player.seer_view[:player].role.upcase}."
+          elsif player.seer_view.has_key?(:table)
+            if @game.onuww?
+              reveal_msg = "Two of the middle cards are: #{player.seer_view[:table]}."
+            else
+              reveal_msg "Middle is #{player.seer_view[:table]}."
+            end
+          end
+        when :thief
+          if player.thief_take.has_key?(:none)
+            reveal_msg = "You remain the THIEF."
+          elsif player.thief_take.has_key?(:player)
+            reveal_msg = "You are now a #{player.thief_take[:player].role.upcase}."
+          elsif player.thief_take.has_key?(:table)
+            reveal_msg = "You are now a #{player.thief_take[:table].upcase}."
+          end
+        when :robber
+          if player.thief_take.has_key?(:none)
+            reveal_msg = "You remain the ROBBER."
+          elsif player.thief_take.has_key?(:player)
+            reveal_msg = "You are now a #{player.thief_take[:player].role.upcase}."
+          end
+        when :insomniac
+          reveal_msg = player.new_role.nil? ? "You are still the INSOMNIAC." : "You are now the #{player.new_role.upcase}."
+        when :mason
+          other_mason = @game.masons.reject{ |m| m == player }
+          reveal_msg = other_mason.empty? ? "You are the only mason." : "You see #{other_mason.join(", ")}."
+        when :minion
+          werewolves = @game.werewolves
+          reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You see #{werewolves.join(", ")}."
+        when :werewolf
+          other_wolf = @game.werewolves.reject{ |w| w == player }
+          reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You see #{other_wolf.join(", ")}."
+        when :doppelganger
+          reveal_msg = "You are annoying"
+        end
+        User(player.user).send reveal_msg
       end
 
       def do_end_game

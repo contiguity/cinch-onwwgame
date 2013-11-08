@@ -29,6 +29,7 @@ class Game
     self.player_cards    = []
     self.table_cards     = []
     self.phase           = :night # starts on night phase
+    self.subphase        = 1
     self.lynch_votes     = {}
   end
 
@@ -232,12 +233,20 @@ class Game
     self.phase = :day
   end
 
+  def finish_subphase1
+    self.subphase = 2
+  end
+
   def day?
     self.phase == :day
   end
 
   def night?
     self.phase == :night
+  end
+
+  def night_subphase1?
+    self.subphase == 1
   end
 
   #----------------------------------------------
@@ -260,12 +269,16 @@ class Game
     self.players.select{ |p| p.werewolf? }
   end
 
+  def masons
+    self.players.select{ |p| p.mason? }
+  end
+
   def humans
     self.players.select{ |p| p.good? }
   end
 
   def non_special
-    self.players.select{ |p| p.villager? || p.werewolf? }
+    self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.mason? || p.insomniac? || p.minion? }
   end
 
 end
@@ -276,7 +289,7 @@ end
 
 class Player
 
-  attr_accessor :user, :role, :new_role, :thief_take, :seer_view, :confirm
+  attr_accessor :user, :role, :new_role, :thief_take, :seer_view, :old_doppelganger, :confirm
 
   def initialize(user)
     self.user = user
@@ -284,7 +297,8 @@ class Player
     self.new_role = nil
     self.seer_view = nil
     self.thief_take = nil
-    self.confirm = false
+    self.old_doppelganger = False
+    self.confirm = False
   end 
 
   def receive_role(role)
@@ -292,7 +306,7 @@ class Player
   end
 
   def confirm_role
-    self.confirm = true
+    self.confirm = True
   end
 
   def to_s
@@ -315,6 +329,30 @@ class Player
     self.role == :villager
   end
 
+  def mason?
+    self.role == :mason
+  end
+
+  def tanner?
+    self.role == :tanner
+  end
+
+  def drunk?
+    self.role == :drunk
+  end
+
+  def hunter?
+    self.role == :hunter
+  end
+
+  def insomniac?
+    self.role == :insomniac
+  end
+
+  def doppelganger?
+    self.role == :doppelganger
+  end
+
   def good?
     [:seer, :thief, :villager, :robber, :troublemaker, :tanner, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
   end
@@ -328,7 +366,7 @@ class Player
   end
 
   def confirmed?
-    self.confirm == true
+    self.confirm
   end
 
   def role?(role)
