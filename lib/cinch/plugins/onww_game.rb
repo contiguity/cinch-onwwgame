@@ -741,10 +741,11 @@ module Cinch
       #--------------------------------------------------------------------------------
      
       def get_game_settings(m)
+        with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
         if @game.onuww?
-          m.reply "Game settings: ONUWW. Using roles: #{self.game_settings[:roles].sort.join(", ")}."
+          m.reply "Game settings: ONUWW. Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
         else
-          m.reply "Game settings: base."
+          m.reply "Game settings: base.#{with_variants}"
         end
       end
 
@@ -757,13 +758,17 @@ module Cinch
           options = game_options || ""
           options = options.downcase.split(" ")
           if game_type.downcase == "onuww"
-            valid_role_options = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "masons"]
-            role_options = options.select{ |opt| valid_role_options.include?(opt) }
+            valid_role_options    = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "masons"]
+            valid_variant_options = ["lonewolf"]
+
+            role_options    = options.select{ |opt| valid_role_options.include?(opt) }
+            variant_options = options.select{ |opt| valid_variant_options.include?(opt) }
+
             if role_options.include?("masons")
               role_options -= ["masons"]
               role_options += ["mason"]
             end
-            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) }
+            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) && !valid_variant_options.include?(opt)}
             if !game_options.nil?
               roles = role_options
               valid_role_options.map{ |vr|
@@ -784,23 +789,24 @@ module Cinch
             end
             unless role_options.nil?
               roles += ["mason"] if (roles.include?("mason") && roles.count("mason") == 1)
-              @game.change_type :onuww, :roles => roles
+              @game.change_type :onuww, :roles => roles, :variants => variant_options
               game_type_message = "#{game_change_prefix} to ONUWW. Using roles #{self.game_settings[:roles].sort.join(", ")}."
             end
           else
             @game.change_type :base
             game_type_message = "#{game_change_prefix} to base."
           end
-          Channel(@channel_name).send "#{game_type_message}"
+          with_variants = self.game_settings[:variants].empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
+          Channel(@channel_name).send "#{game_type_message}#{with_variants}"
         end
       end
 
       def game_settings
         settings = {}
         settings[:roles] = @game.roles
-
+        settings[:variants] = []
         if @game.onuww?
-          #do stuff
+          settings[:variants] << "Lone Wolf" if @game.variants.include?(:lonewolf)
         else
           #do other stuff
         end

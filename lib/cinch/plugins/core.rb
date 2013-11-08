@@ -17,13 +17,14 @@ class Game
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
 
-  attr_accessor :started, :phase, :players, :type, :roles, :player_cards, :table_cards, :lynch_votes, :invitation_sent
+  attr_accessor :started, :phase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :invitation_sent
   
   def initialize
     self.started         = false
     self.players         = []
     self.type            = :base
     self.roles           = []
+    self.variants        = []
     self.invitation_sent = false
     self.player_cards    = []
     self.table_cards     = []
@@ -102,16 +103,22 @@ class Game
   def change_type(type, options = {})
     self.type = type
     if type == :onuww
-      self.roles = options[:roles].map(&:to_sym)
+      self.roles    = options[:roles].map(&:to_sym)
+      self.variants = options[:variants].map(&:to_sym)
       max_players = 10
     else
       self.roles = []
+      self.variants = options[:variants].map(&:to_sym)
       max_players = 6
     end
   end
 
   def onuww?
     self.type == :onuww
+  end
+
+  def with_variant?(variant)
+    self.variants.include?(variant)
   end
 
   def with_role?(role)
