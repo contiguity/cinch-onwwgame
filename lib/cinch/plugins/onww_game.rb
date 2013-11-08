@@ -50,8 +50,11 @@ module Cinch
       match /norob/i,             :method => :thief_take_none
 
       # troublemaker
-      match /switch ?(.+)?/i,     :method => :troublemaker_switch
+      match /switch (.+?) (.+)/i, :method => :troublemaker_switch
       match /noswitch/i,          :method => :troublemaker_noswitch
+
+      # doppelganger
+      match /look ?(.+)?/i,       :method => :doppelganger_look
 
       match /lynch (.+)/i,        :method => :lynch_vote
       match /status/i,            :method => :status
@@ -480,7 +483,7 @@ module Cinch
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
-          if player.thief?
+          if player.thief? || player.robber?
             target_player = @game.find_player(stolen)
             if target_player.nil?
               User(m.user).send "\"#{stolen}\" is an invalid target."  
@@ -495,7 +498,8 @@ module Cinch
               self.check_for_day_phase
             end
           else 
-            User(m.user).send "You are not the THIEF."
+            correct_role = @game.onuww? ? "ROBBER" : "THIEF"
+            User(m.user).send "You are not the #{correct_role}."
           end
         end
       end
@@ -504,13 +508,14 @@ module Cinch
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
-          if player.thief?
+          if player.thief? || player.robber?
             player.thief_take = {:none => "none"}
             player.confirm_role
             User(m.user).send "You remain THIEF."
             self.check_for_day_phase
           else 
-            User(m.user).send "You are not the THIEF."
+            correct_role = @game.onuww? ? "ROBBER" : "THIEF"
+            User(m.user).send "You are not the #{correct_role}."
           end
         end
       end
@@ -528,6 +533,63 @@ module Cinch
             self.check_for_day_phase
           else 
             User(m.user).send "You are not the THIEF."
+          end
+        end
+      end
+
+      def troublemaker_switch(m, switch1, switch2)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          if player.troublemaker?
+            target_player1 = @game.find_player(switch1)
+            target_player2 = @game.find_player(switch2)
+            if target_player1.nil? || target_player2.nil?
+              User(m.user).send "You have specified an invalid target."
+            elsif target_player1 == player || target_player2 == player
+              User(m.user).send "You cannot switch your own role"
+            else
+              player.troublemaker_switch = {:player => "#{target_player1} and #{target_player2}"}
+              target_player1 = target_player2.new_role.nil? ? target_player2.role : target_player2.new_role
+              target_player2 = target_player1.new_role.nil? ? target_player1.role : target_player1.new_role
+              player.confirm_role
+              self.check_for_day_phase
+            end
+          else
+            User(m.user).send "You are not the TROUBLEMAKER"
+          end
+        end
+      end
+
+      def troublemaker_noswitch(m)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          if player.troublemaker?
+            player.troublemaker_switch = {:none => "none"}
+            player.confirm_role
+            self.check_for_day_phase
+          else
+            User(m.user).send "You are not the TROUBLEMAKER."
+          end
+        end
+      end
+
+      def doppelganger_look(m, look)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          if player.doppelganger?
+            target_player = @game.find_player(look)
+            if target_player.nil?
+              User(m.user).send "\"#{look}\" is an invalid target."
+            elsif target_player == player
+              User(m.user).send "You cannot choose yourself."
+            else
+              player.old_doppelganger = True
+              player.receive_role(target_player.role)
+              target_player.new_role = :doppelganger
+              self.tell_role_to(player)
+            end
+          else
+            User(m.user).send "You are not the DOPPELGANGER"
           end
         end
       end
@@ -562,18 +624,6 @@ module Cinch
           loyalty_msg = "You are the #{player.role.upcase}. Type !confirm to confirm your role."
         when :doppelganger
           loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player\""
-        #when :mason
-        #  other_mason = @game.masons.reject{ |m| m == player }
-        #  msg = other_mason.empty? ? "You are the only mason." : "The other mason is #{other mason.first}."
-        #  loyalty_msg = "You are a MASON. #{msg} Type !confirm to confirm your role."
-        #when :minion
-        #  werewolves = @game.werewolves
-        #  msg = werewolves.empty? ? "You do not see any werewolves." : "You see 
-        #  loyalty_msg = "You are the MINION. #{msg}
-        #when :werewolf
-        #  other_wolf = @game.werewolves.reject{ |w| w == player }
-        #  msg = other_wolf.empty? ? "You are a lone wolf." : "The other wolf is #{other_wolf.first}."
-        #  loyalty_msg = "You are a WEREWOLF. #{msg} Type !confirm to confirm your role."
         end
         User(player.user).send loyalty_msg
       end
