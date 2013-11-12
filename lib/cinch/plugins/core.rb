@@ -17,7 +17,7 @@ class Game
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
 
-  attr_accessor :started, :phase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :invitation_sent
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :invitation_sent
   
   def initialize
     self.started         = false
@@ -105,11 +105,15 @@ class Game
     self.type = type
     if type == :onuww
       self.roles    = options[:roles].map(&:to_sym)
-      self.variants = options[:variants].map(&:to_sym)
+      unless options[:variants].nil?
+        self.variants = options[:variants].map(&:to_sym)
+      end
       max_players = 10
     else
       self.roles = []
-      self.variants = options[:variants].map(&:to_sym)
+      unless options[:variants].nil?
+        self.variants = options[:variants].map(&:to_sym)
+      end
       max_players = 6
     end
   end
@@ -157,17 +161,19 @@ class Game
   #
   def pass_out_roles
     # assign loyalties
-    unless self.onuww?
+    if self.onuww?
+      gameroles = self.roles.dup
+    else
       extra_players = self.player_count - MIN_PLAYERS
-      roles = BASE_ROLES + [:villager]*extra_players
+      gameroles = BASE_ROLES + [:villager]*extra_players
     end
-    roles.shuffle!
+    gameroles.shuffle!
     self.players.each do |player|
-      role = roles.shift
+      role = gameroles.shift
       self.player_cards << role
       player.receive_role( role )
     end
-    self.table_cards = roles
+    self.table_cards = gameroles
   end
 
 
@@ -262,7 +268,7 @@ class Game
   end
 
   def find_player_by_role(role)
-    self.players.find{ |p| p.role == role }
+    self.players.find{ |p| p.role == role && !p.old_doppelganger?}
   end
 
   def werewolves
@@ -281,6 +287,11 @@ class Game
     self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.mason? || p.insomniac? || p.minion? }
   end
 
+  def old_doppelganger
+    self.players.find{ |p| p.old_doppelganger? }
+  end
+
+
 end
 
 #================================================================================
@@ -289,28 +300,32 @@ end
 
 class Player
 
-  attr_accessor :user, :role, :new_role, :thief_take, :seer_view, :old_doppelganger, :confirm
+  attr_accessor :user, :role, :cur_role, :action_take, :doppelganger_look, :confirm
 
   def initialize(user)
     self.user = user
     self.role = nil
-    self.new_role = nil
-    self.seer_view = nil
-    self.thief_take = nil
-    self.old_doppelganger = False
-    self.confirm = False
+    self.cur_role = nil
+    self.action_take = nil
+    self.doppelganger_look = nil
+    self.confirm = false
   end 
 
   def receive_role(role)
     self.role = role
+    self.cur_role = role
   end
 
   def confirm_role
-    self.confirm = True
+    self.confirm = true
   end
 
   def to_s
     self.user.nick
+  end
+
+  def villager?
+    self.role == :villager
   end
 
   def werewolf?
@@ -325,12 +340,12 @@ class Player
     self.role == :thief
   end
 
-  def villager?
-    self.role == :villager
+  def robber?
+    self.role == :robber
   end
 
-  def mason?
-    self.role == :mason
+  def troublemaker?
+    self.role == :troublemaker
   end
 
   def tanner?
@@ -345,8 +360,16 @@ class Player
     self.role == :hunter
   end
 
+  def mason?
+    self.role == :mason
+  end
+
   def insomniac?
     self.role == :insomniac
+  end
+
+  def minion?
+    self.role == :minion
   end
 
   def doppelganger?
@@ -362,7 +385,7 @@ class Player
   end
 
   def non_special?
-    self.werewolf? || self.villager?
+    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.mason? || self.insomniac? || self.minion?
   end
 
   def confirmed?
@@ -371,6 +394,10 @@ class Player
 
   def role?(role)
     self.role == role
+  end
+
+  def old_doppelganger?
+    !self.doppelganger_look.nil?
   end
 end
 
