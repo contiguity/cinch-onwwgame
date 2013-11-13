@@ -732,6 +732,8 @@ module Cinch
           end
         end.join(', ')
         Channel(@channel_name).send "Starting Roles: #{roles_msg}"
+        roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
+        Channel(@channel_name).send "Ending Roles: #{roles_msg}"
         Channel(@channel_name).send "Middle Cards: #{@game.table_cards.map(&:upcase).join(', ')}"
 
         #now reveal night actions
