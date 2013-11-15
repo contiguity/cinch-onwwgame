@@ -420,9 +420,6 @@ module Cinch
           else
             @game.lynch_vote(player, target_player)
             User(m.user).send "You have voted to lynch #{target_player}."
-            if player.cur_role == :hunter
-              player.action_take = {:hunter => target_player}
-            end
             
             self.check_for_lynch
           end
@@ -813,7 +810,7 @@ module Cinch
         # Check for hunter and add their target
         if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
           hunter_target = lynching.map { |lynched|
-            lynched.action_take[:hunter] if lynched.hunter?
+            @game.lynch_votes[lynched] if lynched.hunter?
           }
           (lynching+=hunter_target).uniq!
         end
@@ -822,7 +819,7 @@ module Cinch
         # Yay edge cases!
         if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
           hunter_target = lynching.map { |lynched|
-            lynched.action_take[:hunter] if lynched.hunter?
+            @game.lynch_votes[lynched] if lynched.hunter?
           }
           hunter_target.reject! { |r| r.nil? }
           Channel(@channel_name).send "HUNTER chooses: #{hunter_target.join(', ')}."
