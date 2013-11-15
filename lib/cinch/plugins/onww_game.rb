@@ -420,6 +420,11 @@ module Cinch
           else
             @game.lynch_vote(player, target_player)
             User(m.user).send "You have voted to lynch #{target_player}."
+            if player.cur_role == :hunter
+              player.action_take = {:hunter => target_player}
+              Channel(@channel_name).send "ZOMG HUNTER!"
+            end
+            
             self.check_for_lynch
           end
         end
@@ -705,25 +710,7 @@ module Cinch
       end
 
       def do_end_game
-        lynch_totals = @game.lynch_totals
-
-        # sort from max to min
-        lynch_totals = lynch_totals.sort_by{ |vote, voters| voters.size }.reverse
-
-        lynch_msg = lynch_totals.map do |voted, voters|
-          "#{voters.count} - #{voted} (#{voters.join(', ')})"
-        end.join(', ')
-        Channel(@channel_name).send "Final Votes: #{lynch_msg}"
-
-        #grab the first person lynched and see if anyone else matches them
-        first_lynch = lynch_totals.first
-        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
-        lynching = lynching.map{ |voted, voters| voted}
-        
-        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : lynching.join(', ')
-        Channel(@channel_name).send "Lynched players: #{lynched_players}"
-
-        # now reveal roles of everyone
+        # first reveal game intro info
         roles_msg = @game.players.map do |player|
           if player == @game.old_doppelganger
             "#{player} - DOPPELGANGER"
@@ -732,12 +719,30 @@ module Cinch
           end
         end.join(', ')
         Channel(@channel_name).send "Starting Roles: #{roles_msg}"
-        roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
-        Channel(@channel_name).send "Ending Roles: #{roles_msg}"
         Channel(@channel_name).send "Middle Cards: #{@game.table_cards.map(&:upcase).join(', ')}"
 
-        #now reveal night actions
-        #need to turn this into repeatable functions
+        # now reveal night actions
+        # need to turn this into repeatable functions
+        player = @game.old_doppelganger
+        unless player.nil?
+          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look} and became #{player.doppelganger_look.role.upcase}"
+          if player.action_take.has_key?(:seerplayer)
+            Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
+          elsif player.action_take.has_key?(:seertable)
+            Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
+          elsif player.action_take.has_key?(:thiefnone)
+            Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
+          elsif player.action_take.has_key?(:thiefplayer)
+            Channel(@channel_name).send "DOPPELGANGER-ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
+          elsif player.action_take.has_key?(:troublemakernone)
+            Channel(@channel_name).send "DOPPELGANGER-TROUBLEMAKER switched no one"
+          elsif player.action_take.has_key?(:troublemakerplayer)
+            Channel(@channel_name).send "OPPELGANGER-TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer]}"
+          elsif player.action_take.has_key?(:drunk)
+            Channel(@channel_name).send "DOPPELGANGER-DRUNK drew #{player.action_take[:drunk].upcase} from the table"
+          end
+        end
+
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.action_take.has_key?(:seerplayer)
@@ -781,39 +786,88 @@ module Cinch
           Channel(@channel_name).send "DRUNK drew #{player.action_take[:drunk].upcase} from the table"
         end
 
-        player = @game.old_doppelganger
-        unless player.nil?
-          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look} and became #{player.doppelganger_look.role.upcase}"
-          if player.action_take.has_key?(:seerplayer)
-            Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
-          elsif player.action_take.has_key?(:seertable)
-            Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
-          elsif player.action_take.has_key?(:thiefnone)
-            Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
-          elsif player.action_take.has_key?(:thiefplayer)
-            Channel(@channel_name).send "DOPPELGANGER-ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
-          elsif player.action_take.has_key?(:troublemakernone)
-            Channel(@channel_name).send "DOPPELGANGER-TROUBLEMAKER switched no one"
-          elsif player.action_take.has_key?(:troublemakerplayer)
-            Channel(@channel_name).send "OPPELGANGER-TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer]}"
-          elsif player.action_take.has_key?(:drunk)
-            Channel(@channel_name).send "DOPPELGANGER-DRUNK drew #{player.action_take[:drunk].upcase} from the table"
-          end
-        end
 
-        #replace everyones starting roles with stolen roles        
+        # show ending role result
+        roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
+        Channel(@channel_name).send "Ending Roles: #{roles_msg}"
+
+        # replace everyones starting roles with stolen roles        
         @game.players.map do |player|
           player.role = player.cur_role
         end
 
-        #return victory result
-        unless (@game.onuww?)
-          if (lynching.detect { |l| l.werewolf? } && first_lynch[1].count > 1) || (!lynching.detect { |l| l.werewolf? } && first_lynch[1].count == 1)
-            Channel(@channel_name).send "Humans WIN! Team: #{@game.humans.join(', ')}"
-          elsif @game.werewolves.empty?
-            Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh"
+        lynch_totals = @game.lynch_totals
+
+        # sort from max to min
+        lynch_totals = lynch_totals.sort_by{ |vote, voters| voters.size }.reverse
+
+        lynch_msg = lynch_totals.map do |voted, voters|
+          "#{voters.count} - #{voted} (#{voters.join(', ')})"
+        end.join(', ')
+        Channel(@channel_name).send "Final Votes: #{lynch_msg}"
+
+        #grab the first person lynched and see if anyone else matches them
+        first_lynch = lynch_totals.first
+        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
+        lynching = lynching.map{ |voted, voters| voted}
+
+        # Check for hunter and add their target
+        if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
+          hunter_target = lynching.map { |lynched|
+            lynched.action_take[:hunter] if lynched.hunter?
+          }
+          (lynching+=hunter_target).uniq!
+        end
+
+        # Do it again in case the target of a hunter is another hunter
+        # Yay edge cases!
+        if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
+          hunter_target = lynching.map { |lynched|
+            lynched.action_take[:hunter] if lynched.hunter?
+          }
+          hunter_target.reject! { |r| r.nil? }
+          Channel(@channel_name).send "HUNTER chooses: #{hunter_target.join(', ')}."
+          (lynching+=hunter_target).uniq!
+        end
+
+        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : lynching.join(', ')
+        Channel(@channel_name).send "Lynched players: #{lynched_players}."
+
+        # return victory result
+        # we lynched someone
+        if first_lynch[1].count > 1
+          # werewolf lynched villagers win
+          if lynching.detect { |l| l.werewolf? }
+            if lynching.detect { |l| l.tanner? }
+              dead_tanner = lynching.select{ |l| l.tanner? }
+              Channel(@channel_name).send "Villager team and Tanner WIN! Villager Team: #{@game.humans.join(', ')}. Tanner: #{dead_tanner.join(', ')}."
+            else
+              Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
+            end
+          # no werewolf lynched, werewolves win
           else
-            Channel(@channel_name).send "Werewolves WIN! Team: #{@game.werewolves.join(', ')}"
+            if lynching.detect { |l| l.tanner? }
+              dead_tanner = lynching.select{ |l| l.tanner? }
+              Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
+            elsif @game.werewolves.empty?
+              if lynching.detect { |l| l.good? }
+                minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
+                Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
+              else 
+                Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh"
+              end
+            else
+              minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
+              Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
+            end
+          end
+        # no one is lynched
+        else
+          if @game.werewolves.empty?
+            Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
+          else
+            minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
+            Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
           end
         end
 

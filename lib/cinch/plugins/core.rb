@@ -271,16 +271,28 @@ class Game
     self.players.find{ |p| p.role == role && !p.old_doppelganger?}
   end
 
+  def select_player_by_cur_role(role)
+    self.players.select{ |p| p.cur_role == role }
+  end
+
   def werewolves
     self.players.select{ |p| p.werewolf? }
+  end
+
+  def humans
+    self.players.select{ |p| p.good? }
   end
 
   def masons
     self.players.select{ |p| p.mason? }
   end
 
-  def humans
-    self.players.select{ |p| p.good? }
+  def minion
+    self.players.select{ |p| p.minion? }
+  end
+
+  def hunter
+    self.players.select{ |p| p.hunter? }
   end
 
   def non_special
@@ -290,7 +302,6 @@ class Game
   def old_doppelganger
     self.players.find{ |p| p.old_doppelganger? }
   end
-
 
 end
 
@@ -377,7 +388,7 @@ class Player
   end
 
   def good?
-    [:seer, :thief, :villager, :robber, :troublemaker, :tanner, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
+    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
   end
 
   def evil?
