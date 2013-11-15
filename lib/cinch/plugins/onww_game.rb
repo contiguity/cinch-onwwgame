@@ -422,7 +422,6 @@ module Cinch
             User(m.user).send "You have voted to lynch #{target_player}."
             if player.cur_role == :hunter
               player.action_take = {:hunter => target_player}
-              Channel(@channel_name).send "ZOMG HUNTER!"
             end
             
             self.check_for_lynch
