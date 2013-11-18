@@ -1,6 +1,7 @@
 - date: "2013-11-18"
   changes:
     - "Disallow self vote in onuww"
+    - "Dump player list at game start"
 - date: "2013-11-15"
   changes:
     - "Add victory output"

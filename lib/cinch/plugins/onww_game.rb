@@ -347,7 +347,8 @@ module Cinch
         Channel(@channel_name).send "The game has started."
         if @game.onuww?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
-          Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}" 
+          Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
+          Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}" 
         end
 
         @game.start_game!
