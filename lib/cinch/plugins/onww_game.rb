@@ -417,6 +417,8 @@ module Cinch
           target_player = @game.find_player(vote)
           if target_player.nil?
             User(m.user).send "\"#{vote}\" is an invalid target."  
+          elsif (target_player == player && @game.onuww?)
+            User(m.user).send "You may not vote to lynch yourself."
           else
             @game.lynch_vote(player, target_player)
             User(m.user).send "You have voted to lynch #{target_player}."
