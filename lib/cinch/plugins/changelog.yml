@@ -2,6 +2,7 @@
   changes:
     - "Disallow self vote in onuww"
     - "Dump player list at game start"
+    - "Fix output when everyone loses"
 - date: "2013-11-15"
   changes:
     - "Add victory output"

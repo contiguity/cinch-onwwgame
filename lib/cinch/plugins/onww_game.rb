@@ -850,10 +850,10 @@ module Cinch
               Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
             elsif @game.werewolves.empty?
               if lynching.detect { |l| l.good? }
-                minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
+                minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
               else 
-                Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh"
+                Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh."
               end
             else
               minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
