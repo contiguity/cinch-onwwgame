@@ -268,7 +268,7 @@ class Game
   end
 
   def find_player_by_role(role)
-    self.players.find{ |p| p.role == role && !p.old_doppelganger?}
+    self.players.find{ |p| p.role == role && !p.old_doppelganger? }
   end
 
   def select_player_by_cur_role(role)
@@ -276,7 +276,7 @@ class Game
   end
 
   def werewolves
-    self.players.select{ |p| p.werewolf? }
+    self.players.select{ |p| p.werewolf? || p.dg_role?(:werewolf) }
   end
 
   def humans
@@ -284,7 +284,11 @@ class Game
   end
 
   def masons
-    self.players.select{ |p| p.mason? }
+    self.players.select{ |p| p.mason? || p.dg_role?(:mason)}
+  end
+
+  def insomniacs
+    self.players.select{ |p| p.insomniac? || p.dg_role?(:mason)}
   end
 
   def minion
@@ -301,6 +305,10 @@ class Game
 
   def old_doppelganger
     self.players.find{ |p| p.old_doppelganger? }
+  end
+
+  def doppelganger_role
+    self.players.find{ |p| p.old_doppelganger? }.doppelganger_look[:dgrole]
   end
 
 end
@@ -405,6 +413,12 @@ class Player
 
   def role?(role)
     self.role == role
+  end
+
+  def dg_role?(role)
+    unless self.doppelganger_look.nil?
+      self.doppelganger_look[:dgrole] == role
+    end
   end
 
   def old_doppelganger?

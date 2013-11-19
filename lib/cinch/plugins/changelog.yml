@@ -1,3 +1,6 @@
+- date: "2013-11-19"
+  changes:
+    - "Ensure player timing is enforced"
 - date: "2013-11-15"
   changes:
     - "Add victory output"

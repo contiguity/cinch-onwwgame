@@ -366,15 +366,6 @@ module Cinch
         end
 
         self.pass_out_roles
-
-        # first see if we need to wait, if we do, just wait
-        # if not, artificially wait
-        #if @game.waiting_on_role_confirm
-        #  # wait
-        #else
-        #  self.start_day_artifically
-        #end
-
       end
 
       def start_day_phase
@@ -388,19 +379,10 @@ module Cinch
 
       def start_night_phase2
         @game.finish_subphase1
-        #loop through players and reveal information
-        @game.players.each do |p|
-          self.tell_reveal_to(p)
-        end
+        self.night_reveal
 
         self.start_day_phase
       end
-
-      #def start_day_artifically
-      #  # no timer for now, but will be a random timer after we notice
-      #  # how long it takes players usually
-      #  self.start_day_phase
-      #end
 
       def check_for_day_phase
         if @game.waiting_on_role_confirm
@@ -453,7 +435,7 @@ module Cinch
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
-          if player.seer?
+          if (player.seer? || (player.doppelganger? && player.cur_role == :seer))
             target_player = @game.find_player(view)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
@@ -477,7 +459,7 @@ module Cinch
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
-          if player.seer?
+          if (player.seer? || (player.doppelganger? && player.cur_role == :seer))
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             else
@@ -500,7 +482,7 @@ module Cinch
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
     
-          if player.thief? || player.robber?
+          if (player.thief? || player.robber? || (player.doppelganger? && player.cur_role == :robber))
             target_player = @game.find_player(stolen)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
@@ -510,7 +492,6 @@ module Cinch
               User(m.user).send "You cannot steal from yourself."
             else
               player.action_take = {:thiefplayer => target_player}
-              player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
               player.confirm_role
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
@@ -527,7 +508,7 @@ module Cinch
           player = @game.find_player(m.user)
           correct_role = @game.onuww? ? "ROBBER" : "THIEF"
 
-          if player.thief? || player.robber?
+          if (player.thief? || player.robber? || (player.doppelganger? && player.cur_role == :robber))
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             else
@@ -552,7 +533,6 @@ module Cinch
             else
               new_thief = @game.table_cards.shuffle.first
               player.action_take = {:thieftable => new_thief}
-              player.cur_role = new_thief
               player.confirm_role
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
@@ -566,7 +546,7 @@ module Cinch
       def troublemaker_switch(m, switch1, switch2)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-          if player.troublemaker?
+          if (player.troublemaker? || (player.doppelganger? && player.cur_role == :troublemaker))
             target_player1 = @game.find_player(switch1)
             target_player2 = @game.find_player(switch2)
             
@@ -577,8 +557,7 @@ module Cinch
             elsif target_player1 == player || target_player2 == player
               User(m.user).send "You cannot switch your own role"
             else
-              player.action_take = {:troublemakerplayer => "#{target_player1} and #{target_player2}"}
-              target_player1.cur_role,target_player2.cur_role = target_player2.cur_role,target_player1.cur_role
+              player.action_take = {:troublemakerplayer => [target_player1, target_player2]}
               player.confirm_role
               User(m.user).send "Your action has been confirmed"
               self.check_for_day_phase
@@ -592,7 +571,7 @@ module Cinch
       def troublemaker_noswitch(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-          if player.troublemaker?
+          if (player.troublemaker? || (player.doppelganger? && player.cur_role == :troublemaker))
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             else
@@ -619,8 +598,8 @@ module Cinch
             elsif target_player == player
               User(m.user).send "You cannot choose yourself."
             else
-              player.doppelganger_look = target_player
-              player.receive_role(target_player.role)
+              player.doppelganger_look = {:dglook => target_player, :dgrole => target_player.cur_role}
+              player.cur_role = target_player.role
               self.tell_role_to(player)
             end
           else
@@ -644,9 +623,9 @@ module Cinch
       end
       
       def tell_role_to(player)
-        case player.role
+        case player.cur_role
         when :villager, :werewolf, :mason
-          loyalty_msg = "You are a #{player.role.upcase}. Type !confirm to confirm your role."
+          loyalty_msg = "You are a #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :seer
           loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
         when :thief
@@ -656,53 +635,129 @@ module Cinch
         when :troublemaker
           loyalty_msg = "You are the TROUBLEMAKER. Do you want to switch the roles of two players? \"!switch [player1] [player2]\" or \"!noswitch\""
         when :tanner, :drunk, :hunter, :insomniac, :minion
-          loyalty_msg = "You are the #{player.role.upcase}. Type !confirm to confirm your role."
+          loyalty_msg = "You are the #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :doppelganger
           loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player]\""
         end
         User(player.user).send loyalty_msg
       end
 
-      def tell_reveal_to(player)
-        case player.role
-        when :seer
+      def night_reveal
+        unless @game.old_doppelganger.nil?
+          player.cur_role = player.role
+          case @game.doppelganger_role
+          when :minion
+            werewolves = @game.werewolves
+            reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for other werewolves and see: #{werewolves.join(", ")}."
+            User(player.user).send reveal_msg
+          when :seer
+            if player.action_take.has_key?(:seerplayer)
+              User(player.user).send "#{player.action_take[:seerplayer]} is #{player.action_take[:seerplayer].cur_role.upcase}."
+            elsif player.action_take.has_key?(:seertable)
+              if @game.onuww?
+                User(player.user).send "Two of the middle cards are: #{player.action_take[:seertable]}."
+              else
+                User(player.user).send "Middle is #{player.action_take[:seertable]}."
+              end
+            end
+          when :robber
+            if player.action_take.has_key?(:thiefnone)
+              User(player.user).send "You remain the #{player.role.upcase}"
+            elsif player.action_take.has_key?(:thiefplayer)
+              target_player = player.action_take[:thiefplayer]
+              player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
+              User(player.user).send "You are now a #{player.action_take[:thiefplayer].role.upcase}."
+            end
+          when :troublemaker
+            if player.action_take.has_key?(:troublemakerplayer)
+              player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
+            end          
+          when :drunk
+            newrole = @game.table_cards.shuffle.shift
+            @game.table_cards.push(:drunk)
+            player.cur_role = newrole
+            player.action_take = {:drunk => newrole}
+            User(player.user).send "You have exchanged your card with a card from the middle."
+          end
+        end
+
+        unless @game.werewolves.nil?
+          @game.werewolves.each do |p|
+            other_wolf = @game.werewolves.reject{ |w| w == p }
+            reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
+            User(p.user).send reveal_msg
+          end
+        end
+
+        player = @game.find_player_by_role(:minion)
+        unless player.nil?
+          werewolves = @game.werewolves
+          reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for other werewolves and see: #{werewolves.join(", ")}."
+          User(player.user).send reveal_msg
+        end
+
+        unless @game.masons.nil?
+          @game.masons.each do |p|
+            other_mason = @game.masons.reject{ |m| m == p }
+            reveal_msg = other_mason.empty? ? "You are the only mason." : "You look for other masons and see: #{other_mason.join(", ")}."
+            User(p.user).send reveal_msg
+          end
+        end
+
+        player = @game.find_player_by_role(:seer)
+        unless player.nil?
           if player.action_take.has_key?(:seerplayer)
-            reveal_msg = "#{player.action_take[:seerplayer]} is #{player.action_take[:seerplayer].role.upcase}."
+            User(player.user).send "#{player.action_take[:seerplayer]} is #{player.action_take[:seerplayer].cur_role.upcase}."
           elsif player.action_take.has_key?(:seertable)
             if @game.onuww?
-              reveal_msg = "Two of the middle cards are: #{player.action_take[:seertable]}."
+              User(player.user).send "Two of the middle cards are: #{player.action_take[:seertable]}."
             else
-              reveal_msg = "Middle is #{player.action_take[:seertable]}."
+              User(player.user).send "Middle is #{player.action_take[:seertable]}."
             end
-          end
-        when :thief, :robber
+          end 
+        end
+
+        if @game.onuww?
+          player = @game.find_player_by_role(:robber)
+        else
+          player = @game.find_player_by_role(:thief)
+        end
+        unless player.nil?
           if player.action_take.has_key?(:thiefnone)
-            reveal_msg = "You remain the #{player.role.upcase}"
+            User(player.user).send "You remain the #{player.role.upcase}"
           elsif player.action_take.has_key?(:thiefplayer)
-            reveal_msg = "You are now a #{player.action_take[:thiefplayer].role.upcase}."
+            target_player = player.action_take[:thiefplayer]
+            player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
+            User(player.user).send "You are now a #{player.action_take[:thiefplayer].role.upcase}."
           elsif player.action_take.has_key?(:thieftable)
-            reveal_msg = "You are now a #{player.action_take[:thieftable].upcase}."
+            new_thief = @game.table_cards.shuffle.first
+            player.action_take = {:thieftable => new_thief}
+            player.cur_role = new_thief
+            User(player.user).send "You are now a #{player.action_take[:thieftable].upcase}."
           end
-        when :drunk
+        end
+
+        player = @game.find_player_by_role(:troublemaker)
+        unless player.nil?
+          if player.action_take.has_key?(:troublemakerplayer)
+            player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
+          end
+        end
+        
+        player = @game.find_player_by_role(:drunk)
+        unless player.nil?
           newrole = @game.table_cards.shuffle.first
           player.cur_role = newrole
           player.action_take = {:drunk => newrole}
-          reveal_msg = "You have exchanged your card with a card from the middle."
-        when :insomniac
-          reveal_msg = player.cur_role == player.role ? "You are still the INSOMNIAC." : "You are now the #{player.cur_role.upcase}."
-        when :mason
-          other_mason = @game.masons.reject{ |m| m == player }
-          reveal_msg = other_mason.empty? ? "You are the only mason." : "You look for other masons and see: #{other_mason.join(", ")}."
-        when :minion
-          werewolves = @game.werewolves
-          reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for other werewolves and see: #{werewolves.join(", ")}."
-        when :werewolf
-          other_wolf = @game.werewolves.reject{ |w| w == player }
-          reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
-        when :doppelganger
-          reveal_msg = "You are annoying"
+          User(player.user).send "You have exchanged your card with a card from the middle."
         end
-        User(player.user).send reveal_msg
+
+        unless @game.insomniacs.nil?
+          @game.insomniacs.each do |p|
+            reveal_msg = player.cur_role == player.role ? "You are still the INSOMNIAC." : "You are now the #{player.cur_role.upcase}."
+            User(player.user).send reveal_msg
+          end
+        end
       end
 
       def do_end_game
