@@ -425,8 +425,3 @@ class Player
     !self.doppelganger_look.nil?
   end
 end
-
-
-
-
-

@@ -347,7 +347,8 @@ module Cinch
         Channel(@channel_name).send "The game has started."
         if @game.onuww?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
-          Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}" 
+          Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
+          Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}" 
         end
 
         @game.start_game!
@@ -399,6 +400,8 @@ module Cinch
           target_player = @game.find_player(vote)
           if target_player.nil?
             User(m.user).send "\"#{vote}\" is an invalid target."  
+          elsif (target_player == player && @game.onuww?)
+            User(m.user).send "You may not vote to lynch yourself."
           else
             @game.lynch_vote(player, target_player)
             User(m.user).send "You have voted to lynch #{target_player}."
@@ -902,10 +905,10 @@ module Cinch
               Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
             elsif @game.werewolves.empty?
               if lynching.detect { |l| l.good? }
-                minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
+                minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
               else 
-                Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh"
+                Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh."
               end
             else
               minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
