@@ -690,6 +690,10 @@ module Cinch
             other_wolf = @game.werewolves.reject{ |w| w == p }
             reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
             User(p.user).send reveal_msg
+            if (other_wolf.empty? && @game.with_variant?(:lonewolf))
+              p.action_take = {:lonewolf => @game.table_cards.shuffle.first }
+              User(p.user).send "LONE WOLF: You see #{p.action_take[:lonewolf].upcase} in the middle"
+            end
           end
         end
 
@@ -799,6 +803,12 @@ module Cinch
             end
           end
         end
+
+        if (@game.with_variant?(:lonewolf) && @game.werewolves.count == 1)
+          player = @game.find_player_by_role(:werewolf)
+          Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle"
+        end
+
 
         player = @game.find_player_by_role(:seer)
         unless player.nil?
