@@ -145,7 +145,7 @@ module Cinch
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
-            User(m.user).send "!rules (rolecount|onuwwroles) - provides rules for the game; when provided with an argument, provides specified rules"
+            User(m.user).send "!rules (rolecount|onuwwroles|nightorder) - provides rules for the game; when provided with an argument, provides specified rules"
           # end
         end
       end
@@ -162,6 +162,8 @@ module Cinch
           User(m.user).send "4 players: 2 werewolves, 2 villagers, 1 seer, 1 thief"
           User(m.user).send "5 players: 2 werewolves, 3 villagers, 1 seer, 1 thief"
           User(m.user).send "6~7 players: 2 werewolves, 4 villagers, 1 seer, 1 thief"
+        when "nightorder"
+          User(m.user).send "1: Doppelganger, 2: Werewolves, 3: Minion, 4: Masons, 5: Seer, 6: Robber, 7: Troublemaker, 8: Drunk, 9: Insomniac, 9a: Doppelganger/Insomniac"
         when "onuwwroles"
           User(m.user).send "INSERT ONUWW ROLES HERE!"
         else  
