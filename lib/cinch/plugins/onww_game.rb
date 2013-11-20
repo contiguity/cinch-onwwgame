@@ -420,7 +420,7 @@ module Cinch
       def confirm_role(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-          if player.non_special?
+          if player.non_special? || player.dg_non_special?
             player.confirm_role
             User(m.user).send "Your role has been confirmed"
             self.check_for_day_phase
@@ -647,6 +647,7 @@ module Cinch
 
       def night_reveal
         unless @game.old_doppelganger.nil?
+          player = @game.old_doppelganger
           player.cur_role = player.role
           case @game.doppelganger_role
           when :minion
@@ -730,8 +731,8 @@ module Cinch
             User(player.user).send "You remain the #{player.role.upcase}"
           elsif player.action_take.has_key?(:thiefplayer)
             target_player = player.action_take[:thiefplayer]
+            User(player.user).send "You are now a #{player.action_take[:thiefplayer].cur_role.upcase}."
             player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
-            User(player.user).send "You are now a #{player.action_take[:thiefplayer].role.upcase}."
           elsif player.action_take.has_key?(:thieftable)
             new_thief = @game.table_cards.shuffle.first
             player.action_take = {:thieftable => new_thief}
@@ -757,8 +758,8 @@ module Cinch
 
         unless @game.insomniacs.nil?
           @game.insomniacs.each do |p|
-            reveal_msg = player.cur_role == player.role ? "You are still the INSOMNIAC." : "You are now the #{player.cur_role.upcase}."
-            User(player.user).send reveal_msg
+            reveal_msg = p.cur_role == p.role ? "You are still the INSOMNIAC." : "You are now the #{p.cur_role.upcase}."
+            User(p.user).send reveal_msg
           end
         end
       end
@@ -779,21 +780,23 @@ module Cinch
         # need to turn this into repeatable functions
         player = @game.old_doppelganger
         unless player.nil?
-          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look} and became #{player.doppelganger_look.role.upcase}"
-          if player.action_take.has_key?(:seerplayer)
-            Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
-          elsif player.action_take.has_key?(:seertable)
-            Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
-          elsif player.action_take.has_key?(:thiefnone)
-            Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
-          elsif player.action_take.has_key?(:thiefplayer)
-            Channel(@channel_name).send "DOPPELGANGER-ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
-          elsif player.action_take.has_key?(:troublemakernone)
-            Channel(@channel_name).send "DOPPELGANGER-TROUBLEMAKER switched no one"
-          elsif player.action_take.has_key?(:troublemakerplayer)
-            Channel(@channel_name).send "OPPELGANGER-TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer]}"
-          elsif player.action_take.has_key?(:drunk)
-            Channel(@channel_name).send "DOPPELGANGER-DRUNK drew #{player.action_take[:drunk].upcase} from the table"
+          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look[:dglook]} and became #{player.doppelganger_look[:dgrole].upcase}"
+          unless player.action_take.nil?
+            if player.action_take.has_key?(:seerplayer)
+              Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
+            elsif player.action_take.has_key?(:seertable)
+              Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
+            elsif player.action_take.has_key?(:thiefnone)
+              Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
+            elsif player.action_take.has_key?(:thiefplayer)
+              Channel(@channel_name).send "DOPPELGANGER-ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
+            elsif player.action_take.has_key?(:troublemakernone)
+              Channel(@channel_name).send "DOPPELGANGER-TROUBLEMAKER switched no one"
+            elsif player.action_take.has_key?(:troublemakerplayer)
+              Channel(@channel_name).send "DOPPELGANGER-TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer].join(" and ")}"
+            elsif player.action_take.has_key?(:drunk)
+              Channel(@channel_name).send "DOPPELGANGER-DRUNK drew #{player.action_take[:drunk].upcase} from the table"
+            end
           end
         end
 
@@ -831,7 +834,7 @@ module Cinch
           if player.action_take.has_key?(:troublemakernone)
             Channel(@channel_name).send "TROUBLEMAKER switched no one"
           elsif player.action_take.has_key?(:troublemakerplayer)
-            Channel(@channel_name).send "TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer]}"
+            Channel(@channel_name).send "TROUBLEMAKER switched: #{player.action_take[:troublemakerplayer].join(" and ")}"
           end
         end
 
@@ -849,6 +852,12 @@ module Cinch
         @game.players.map do |player|
           player.role = player.cur_role
         end
+
+        unless @game.old_doppelganger.nil?
+          player = @game.find_player_by_cur_role(:doppelganger)
+          dg_player = @game.old_doppelganger
+          player.role = dg_player.doppelganger_look[:dgrole]
+        end 
 
         lynch_totals = @game.lynch_totals
 

@@ -1,5 +1,7 @@
 - date: "2013-11-19"
   changes:
+    - "Fix stupid copypasta bugs"
+    - "Fix bugs with doppelganger"
     - "Ensure player timing is enforced"
 - date: "2013-11-18"
   changes:

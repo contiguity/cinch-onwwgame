@@ -271,8 +271,8 @@ class Game
     self.players.find{ |p| p.role == role && !p.old_doppelganger? }
   end
 
-  def select_player_by_cur_role(role)
-    self.players.select{ |p| p.cur_role == role }
+  def find_player_by_cur_role(role)
+    self.players.find{ |p| p.cur_role == role }
   end
 
   def werewolves
@@ -288,7 +288,7 @@ class Game
   end
 
   def insomniacs
-    self.players.select{ |p| p.insomniac? || p.dg_role?(:mason)}
+    self.players.select{ |p| p.insomniac? || p.dg_role?(:insomniac)}
   end
 
   def minion
@@ -405,6 +405,10 @@ class Player
 
   def non_special?
     self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.mason? || self.insomniac? || self.minion?
+  end
+
+  def dg_non_special?
+    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion)
   end
 
   def confirmed?
