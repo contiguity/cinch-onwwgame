@@ -809,7 +809,6 @@ module Cinch
           Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle"
         end
 
-
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.action_take.has_key?(:seerplayer)
@@ -995,6 +994,7 @@ module Cinch
             #Channel(@channel_name).send "The resistance were: #{resistance.join(", ")}"
           end
           @game = Game.new
+          Channel(@channel_name).moderated = false
           self.devoice_channel
           Channel(@channel_name).send "The game has been reset."
           @idle_timer.start

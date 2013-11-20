@@ -1,6 +1,7 @@
 - date: "2013-11-20"
   changes:
     - "Added lone wolf variant"
+    - "Unmoderate room on reset"
 - date: "2013-11-19"
   changes:
     - "Fix stupid copypasta bugs"
