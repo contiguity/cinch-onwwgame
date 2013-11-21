@@ -863,7 +863,7 @@ module Cinch
           player = @game.find_player_by_cur_role(:doppelganger)
           dg_player = @game.old_doppelganger
           unless player.nil?
-            player.role = dg_player.doppelganger_look[:dgrole]
+            player.cur_role = dg_player.doppelganger_look[:dgrole]
           end
         end 
 
