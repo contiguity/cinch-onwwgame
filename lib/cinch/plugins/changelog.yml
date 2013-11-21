@@ -3,6 +3,7 @@
     - "Added lone wolf variant"
     - "Unmoderate room on reset"
     - "Add night order to rules"
+    - "Fix drunk doppel"
 - date: "2013-11-19"
   changes:
     - "Fix stupid copypasta bugs"

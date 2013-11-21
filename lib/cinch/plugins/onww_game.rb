@@ -679,8 +679,8 @@ module Cinch
               player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
             end          
           when :drunk
-            newrole = @game.table_cards.shuffle.shift
-            @game.table_cards.push(:drunk)
+            newrole = @game.table_cards.shuffle!.shift
+            @game.table_cards.push(:doppelganger)
             player.cur_role = newrole
             player.action_take = {:drunk => newrole}
             User(player.user).send "You have exchanged your card with a card from the middle."
@@ -859,16 +859,18 @@ module Cinch
         roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
         Channel(@channel_name).send "Ending Roles: #{roles_msg}"
 
+        unless @game.old_doppelganger.nil?
+          player = @game.find_player_by_cur_role(:doppelganger)
+          dg_player = @game.old_doppelganger
+          unless player.nil?
+            player.role = dg_player.doppelganger_look[:dgrole]
+          end
+        end 
+
         # replace everyones starting roles with stolen roles        
         @game.players.map do |player|
           player.role = player.cur_role
         end
-
-        unless @game.old_doppelganger.nil?
-          player = @game.find_player_by_cur_role(:doppelganger)
-          dg_player = @game.old_doppelganger
-          player.role = dg_player.doppelganger_look[:dgrole]
-        end 
 
         lynch_totals = @game.lynch_totals
 
