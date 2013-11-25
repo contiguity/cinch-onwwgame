@@ -183,6 +183,10 @@ class Game
     self.lynch_votes[player] = target_player
   end
 
+  def revoke_lynch_vote(player)
+    self.lynch_votes.delete(player)
+  end
+
   def not_voted
     all_players = self.players
     voted_players = self.lynch_votes.keys

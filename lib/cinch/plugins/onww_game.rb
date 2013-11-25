@@ -57,6 +57,7 @@ module Cinch
       match /look ?(.+)?/i,       :method => :doppelganger_look
 
       match /lynch (.+)/i,        :method => :lynch_vote
+      match /unlynch/i,           :method => :revoke_lynch_vote
       match /status/i,            :method => :status
       match /confirm/i,           :method => :confirm_role
 
@@ -141,6 +142,7 @@ module Cinch
           # else
             User(m.user).send "--- HELP PAGE 1/3 ---"
             User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
+            User(m.user).send "!unlynch - revoke your existing lynch vote, if any"
             User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
@@ -409,6 +411,20 @@ module Cinch
             User(m.user).send "You have voted to lynch #{target_player}."
 
             self.check_for_lynch
+          end
+        end
+      end
+
+      def revoke_lynch_vote(m)
+        if @game.started? && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+
+          previously_lynched_player = @game.lynch_votes[player]
+          if previously_lynched_player.nil?
+            User(m.user).send "You are already lynching no one."
+          else
+            @game.revoke_lynch_vote(player)
+            User(m.user).send "Your vote to lynch #{previously_lynched_player} has been revoked."
           end
         end
       end
