@@ -906,8 +906,8 @@ module Cinch
           (lynching+=hunter_target).uniq!
         end
 
-        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : lynching.join(', ')
-        Channel(@channel_name).send "Lynched players: #{lynched_players}."
+        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : "#{lynching.join(', ')}!"
+        Channel(@channel_name).send "Lynched players: #{lynched_players}"
 
         # return victory result
         # we lynched someone
