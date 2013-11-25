@@ -18,7 +18,7 @@ class Game
     ]
 
   attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :invitation_sent
-  
+
   def initialize
     self.started         = false
     self.players         = []
@@ -42,7 +42,7 @@ class Game
   end
 
   def not_started?
-    self.started == false 
+    self.started == false
   end
 
   def accepting_players?
@@ -145,7 +145,7 @@ class Game
   end
 
   #----------------------------------------------
-  # Game 
+  # Game
   #----------------------------------------------
 
   # Starts up the game
@@ -256,7 +256,7 @@ class Game
   end
 
   #----------------------------------------------
-  # Helpers 
+  # Helpers
   #----------------------------------------------
 
   def player_count
@@ -328,7 +328,7 @@ class Player
     self.action_take = nil
     self.doppelganger_look = nil
     self.confirm = false
-  end 
+  end
 
   def receive_role(role)
     self.role = role
@@ -400,7 +400,7 @@ class Player
   end
 
   def evil?
-    [:werewolf, :minion].any?{ |role| role == self.role} 
+    [:werewolf, :minion].any?{ |role| role == self.role}
   end
 
   def non_special?
