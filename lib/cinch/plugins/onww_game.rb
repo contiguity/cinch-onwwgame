@@ -14,7 +14,7 @@ module Cinch
       def initialize(*args)
         super
         @game = Game.new
- 
+
         @changelog     = self.load_changelog
 
         @mods          = config[:mods]
@@ -34,7 +34,7 @@ module Cinch
       match /start/i,            :method => :start_game_check
 
       # game
-      #match /whoami/i,           :method => :whoami 
+      #match /whoami/i,           :method => :whoami
 
       # seer
       match /view (.+)/i,         :method => :seer_view_player
@@ -57,6 +57,7 @@ module Cinch
       match /look ?(.+)?/i,       :method => :doppelganger_look
 
       match /lynch (.+)/i,        :method => :lynch_vote
+      match /unlynch/i,           :method => :revoke_lynch_vote
       match /status/i,            :method => :status
       match /confirm/i,           :method => :confirm_role
 
@@ -73,7 +74,7 @@ module Cinch
       match /changelog$/i,          :method => :changelog_dir
       match /changelog (\d+)/i,     :method => :changelog
       # match /about/i,               :method => :about
-   
+
       # mod only commands
       match /reset/i,              :method => :reset_game
       match /replace (.+?) (.+)/i, :method => :replace_user
@@ -89,7 +90,7 @@ module Cinch
       #--------------------------------------------------------------------------------
       # Listeners & Timers
       #--------------------------------------------------------------------------------
-      
+
       def voice_if_in_game(m)
         if @game.has_player?(m.user)
           Channel(@channel_name).voice(m.user)
@@ -131,7 +132,7 @@ module Cinch
           User(m.user).send "!replace nick1 nick1 - replaces a player in-game with a player out-of-game"
           User(m.user).send "!kick nick1 - removes a presumably unresponsive user from an unstarted game"
           User(m.user).send "!room silent|vocal - switches the channel from voice only users and back"
-        else 
+        else
           # case page
           # when "2"
           #   User(m.user).send "--- HELP PAGE 2/3 ---"
@@ -141,6 +142,7 @@ module Cinch
           # else
             User(m.user).send "--- HELP PAGE 1/3 ---"
             User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
+            User(m.user).send "!unlynch - revoke your existing lynch vote, if any"
             User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
@@ -166,7 +168,7 @@ module Cinch
           User(m.user).send "1: Doppelganger, 2: Werewolves, 3: Minion, 4: Masons, 5: Seer, 6: Robber, 7: Troublemaker, 8: Drunk, 9: Insomniac, 9a: Doppelganger/Insomniac"
         when "onuwwroles"
           User(m.user).send "INSERT ONUWW ROLES HERE!"
-        else  
+        else
           User(m.user).send "One Night Werewolf is based on the party game \"Are you a werewolf?\'. In One Night Werewolf, there is a single night phase and a single day phase.  Just as in Werewolf, players are dealt roles which are kept hidden for the duration of the game.  There are always two more roles than the number of players.  During the night phase, the seer and thief (if in play) can use their abilities in order."
           User(m.user).send "First, the werewolves reveal to each other, or learn that they are the only one currently in play.  Next, the seer can either look at ONE player's role or look at the two remaining roles on the table. Finally, the thief can then choose to either exchange roles with another player, exchange roles with one of the remaining roles from the table, or not at all.  If the thief exchanges with another player, the chosen player does not know if their role was exchanged or not."
           User(m.user).send "During the day phase, players discuss who the werewolves are (or if there even are werewolves...).  Then, all players vote on who should be lynched.  The player with the most votes is lynched.  In the case of a tie, all tied players are lynched. If at least one werewolf is lynched, the humans win. If no werewolf is lynched, the werewolves win."
@@ -188,7 +190,7 @@ module Cinch
 
       def changelog_dir(m)
         @changelog.first(5).each_with_index do |changelog, i|
-          User(m.user).send "#{i+1} - #{changelog["date"]} - #{changelog["changes"].length} changes" 
+          User(m.user).send "#{i+1} - #{changelog["date"]} - #{changelog["changes"].length} changes"
         end
       end
 
@@ -204,7 +206,7 @@ module Cinch
         if @game.accepting_players?
           if @game.invitation_sent?
             m.reply "An invitation cannot be sent out again so soon."
-          else      
+          else
             @game.mark_invitation_sent
             User("BG3PO").send "!invite_to_onww_game"
             User(m.user).send "Invitation has been sent."
@@ -236,7 +238,7 @@ module Cinch
           User(m.user).send "You are already subscribed to the invitation list."
         else
           if User(m.user).authed?
-            subscribers << m.user.nick 
+            subscribers << m.user.nick
             settings["subscribers"] = subscribers
             save_settings(settings)
             User(m.user).send "You've been subscribed to the invitation list."
@@ -273,7 +275,7 @@ module Cinch
       def join(m)
         # self.reset_timer(m)
         if Channel(@channel_name).has_user?(m.user)
-          if @game.accepting_players? 
+          if @game.accepting_players?
             added = @game.add_player(m.user)
             unless added.nil?
               Channel(@channel_name).send "#{m.user.nick} has joined the game (#{@game.players.count}/#{@game.max_players})"
@@ -329,7 +331,7 @@ module Cinch
                 elsif self.game_settings[:roles].count > num_total_cards
                   Channel(@channel_name).send "More roles specified than number of players."
                 else
-                 self.do_start_game 
+                 self.do_start_game
                 end
               else
                 self.do_start_game
@@ -350,7 +352,7 @@ module Cinch
         if @game.onuww?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
           Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
-          Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}" 
+          Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}"
         end
 
         @game.start_game!
@@ -398,17 +400,31 @@ module Cinch
       def lynch_vote(m, vote)
         if @game.started? && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-    
+
           target_player = @game.find_player(vote)
           if target_player.nil?
-            User(m.user).send "\"#{vote}\" is an invalid target."  
+            User(m.user).send "\"#{vote}\" is an invalid target."
           elsif (target_player == player && @game.onuww?)
             User(m.user).send "You may not vote to lynch yourself."
           else
             @game.lynch_vote(player, target_player)
             User(m.user).send "You have voted to lynch #{target_player}."
-            
+
             self.check_for_lynch
+          end
+        end
+      end
+
+      def revoke_lynch_vote(m)
+        if @game.started? && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+
+          previously_lynched_player = @game.lynch_votes[player]
+          if previously_lynched_player.nil?
+            User(m.user).send "You are already lynching no one."
+          else
+            @game.revoke_lynch_vote(player)
+            User(m.user).send "Your vote to lynch #{previously_lynched_player} has been revoked."
           end
         end
       end
@@ -439,13 +455,13 @@ module Cinch
       def seer_view_player(m, view)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-    
+
           if (player.seer? || (player.doppelganger? && player.cur_role == :seer))
             target_player = @game.find_player(view)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             elsif target_player.nil?
-              User(m.user).send "\"#{view}\" is an invalid target."  
+              User(m.user).send "\"#{view}\" is an invalid target."
             elsif target_player == player
               User(m.user).send "You cannot view yourself."
             else
@@ -454,7 +470,7 @@ module Cinch
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
             end
-          else 
+          else
             User(m.user).send "You are not the SEER."
           end
         end
@@ -463,7 +479,7 @@ module Cinch
       def seer_view_table(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-    
+
           if (player.seer? || (player.doppelganger? && player.cur_role == :seer))
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
@@ -477,7 +493,7 @@ module Cinch
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
             end
-          else 
+          else
             User(m.user).send "You are not the SEER."
           end
         end
@@ -486,13 +502,13 @@ module Cinch
       def thief_take_player(m, stolen)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-    
+
           if (player.thief? || player.robber? || (player.doppelganger? && player.cur_role == :robber))
             target_player = @game.find_player(stolen)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             elsif target_player.nil?
-              User(m.user).send "\"#{stolen}\" is an invalid target."  
+              User(m.user).send "\"#{stolen}\" is an invalid target."
             elsif target_player == player
               User(m.user).send "You cannot steal from yourself."
             else
@@ -501,7 +517,7 @@ module Cinch
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
             end
-          else 
+          else
             correct_role = @game.onuww? ? "ROBBER" : "THIEF"
             User(m.user).send "You are not the #{correct_role}."
           end
@@ -522,7 +538,7 @@ module Cinch
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
             end
-          else 
+          else
             User(m.user).send "You are not the #{correct_role}."
           end
         end
@@ -531,7 +547,7 @@ module Cinch
       def thief_take_table(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
-      
+
           if player.thief?
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
@@ -542,7 +558,7 @@ module Cinch
               User(m.user).send "Your action has been confirmed."
               self.check_for_day_phase
             end
-          else 
+          else
             User(m.user).send "You are not the THIEF."
           end
         end
@@ -554,7 +570,7 @@ module Cinch
           if (player.troublemaker? || (player.doppelganger? && player.cur_role == :troublemaker))
             target_player1 = @game.find_player(switch1)
             target_player2 = @game.find_player(switch2)
-            
+
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             elsif target_player1.nil? || target_player2.nil?
@@ -626,7 +642,7 @@ module Cinch
           self.tell_role_to(player)
         end
       end
-      
+
       def tell_role_to(player)
         case player.cur_role
         when :villager, :werewolf, :mason
@@ -677,7 +693,7 @@ module Cinch
           when :troublemaker
             if player.action_take.has_key?(:troublemakerplayer)
               player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
-            end          
+            end
           when :drunk
             newrole = @game.table_cards.shuffle!.shift
             @game.table_cards.push(:doppelganger)
@@ -724,7 +740,7 @@ module Cinch
             else
               User(player.user).send "Middle is #{player.action_take[:seertable]}."
             end
-          end 
+          end
         end
 
         if @game.onuww?
@@ -753,7 +769,7 @@ module Cinch
             player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
           end
         end
-        
+
         player = @game.find_player_by_role(:drunk)
         unless player.nil?
           newrole = @game.table_cards.shuffle.first
@@ -819,7 +835,7 @@ module Cinch
             Channel(@channel_name).send "SEER looked at the table and saw: #{player.action_take[:seertable]}"
           end
         end
-        
+
         player = @game.find_player_by_role(:thief)
         unless player.nil?
           if player.action_take.has_key?(:thiefnone)
@@ -827,7 +843,7 @@ module Cinch
           elsif player.action_take.has_key?(:thiefplayer)
             Channel(@channel_name).send "THIEF took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
           elsif player.action_take.has_key?(:thieftable)
-            Channel(@channel_name).send "THIEF took: #{player.action_take[:thieftable].upcase} from the table" 
+            Channel(@channel_name).send "THIEF took: #{player.action_take[:thieftable].upcase} from the table"
           end
         end
 
@@ -865,9 +881,9 @@ module Cinch
           unless player.nil?
             player.cur_role = dg_player.doppelganger_look[:dgrole]
           end
-        end 
+        end
 
-        # replace everyones starting roles with stolen roles        
+        # replace everyones starting roles with stolen roles
         @game.players.map do |player|
           player.role = player.cur_role
         end
@@ -930,7 +946,7 @@ module Cinch
               if lynching.detect { |l| l.good? }
                 minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
-              else 
+              else
                 Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh."
               end
             else
@@ -986,8 +1002,8 @@ module Cinch
       #--------------------------------------------------------------------------------
 
       def is_mod?(nick)
-        # make sure that the nick is in the mod list and the user in authenticated 
-        user = User(nick) 
+        # make sure that the nick is in the mod list and the user in authenticated
+        user = User(nick)
         user.authed? && @mods.include?(user.authname)
       end
 
@@ -1026,7 +1042,7 @@ module Cinch
           # find irc users based on nick
           user1 = User(nick1)
           user2 = User(nick2)
-          
+
           # replace the users for the players
           player = @game.find_player(user1)
           player.user = user2
@@ -1092,7 +1108,7 @@ module Cinch
       #--------------------------------------------------------------------------------
       # Settings
       #--------------------------------------------------------------------------------
-     
+
       def get_game_settings(m)
         with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
         if @game.onuww?
@@ -1132,7 +1148,7 @@ module Cinch
                   role_options = nil
                   Channel(@channel_name).send "You have included #{vr} too many times."
                 end
-                
+
               }
               if unknown_options.count > 0
                 Channel(@channel_name).send "Unknown roles specified: #{unknown_options.join(", ")}."
@@ -1187,9 +1203,9 @@ module Cinch
 
         changelog
       end
-      
+
 
     end
-    
+
   end
 end
