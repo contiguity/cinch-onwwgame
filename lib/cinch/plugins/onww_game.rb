@@ -892,6 +892,7 @@ module Cinch
           hunter_target = lynching.map { |lynched|
             @game.lynch_votes[lynched] if lynched.hunter?
           }
+          hunter_target.reject! { |r| r.nil? }
           (lynching+=hunter_target).uniq!
         end
 
