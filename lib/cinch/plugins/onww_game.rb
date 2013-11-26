@@ -874,7 +874,18 @@ module Cinch
 
 
         # show ending role result
-        roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
+        roles_msg = @game.players.map{ |player| 
+          if (player.role != player.cur_role || player.old_doppelganger?)
+            if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)
+              Format(:bold, "#{player} - #{player.cur_role.upcase}-#{@game.doppelganger_role.upcase}")
+            else
+              Format(:bold, "#{player} - #{player.cur_role.upcase}") 
+            end
+          else
+            "#{player} - #{player.cur_role.upcase}"
+          end
+        }.join(', ')
+          
         Channel(@channel_name).send "Ending Roles: #{roles_msg}"
 
         unless @game.old_doppelganger.nil?

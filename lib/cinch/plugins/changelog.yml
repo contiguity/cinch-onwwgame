@@ -1,6 +1,7 @@
 - date: "2013-11-26"
   changes:
     - "Fixed robber end game output"
+    - "Show dg-role in final roles output"
 - date: "2013-11-25"
   changes:
     - "Fixed hunter bug"
