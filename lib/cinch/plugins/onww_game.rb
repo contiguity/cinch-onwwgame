@@ -687,6 +687,7 @@ module Cinch
               User(player.user).send "You remain the #{player.role.upcase}"
             elsif player.action_take.has_key?(:thiefplayer)
               target_player = player.action_take[:thiefplayer]
+              
               player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
               User(player.user).send "You are now a #{player.action_take[:thiefplayer].role.upcase}."
             end
@@ -753,6 +754,7 @@ module Cinch
             User(player.user).send "You remain the #{player.role.upcase}"
           elsif player.action_take.has_key?(:thiefplayer)
             target_player = player.action_take[:thiefplayer]
+            player.action_take[:thiefplayerrole] = target_player.cur_role
             User(player.user).send "You are now a #{player.action_take[:thiefplayer].cur_role.upcase}."
             player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
           elsif player.action_take.has_key?(:thieftable)
@@ -852,7 +854,7 @@ module Cinch
           if player.action_take.has_key?(:thiefnone)
             Channel(@channel_name).send "ROBBER took from no one"
           elsif player.action_take.has_key?(:thiefplayer)
-            Channel(@channel_name).send "ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
+            Channel(@channel_name).send "ROBBER took: #{player.action_take[:thiefplayerrole].upcase} from #{player.action_take[:thiefplayer]}"
           end
         end
 
