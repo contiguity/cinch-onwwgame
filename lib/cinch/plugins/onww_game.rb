@@ -36,6 +36,11 @@ module Cinch
       # game
       #match /whoami/i,           :method => :whoami
 
+      # claims
+      match /claim (.+)/i,        :method => :claim_role
+      match /unclaim/i,           :method => :unclaim_role
+      match /claims/i,            :method => :list_claims
+
       # seer
       match /view (.+)/i,         :method => :seer_view_player
       match /tableview/i,         :method => :seer_view_table
@@ -85,7 +90,6 @@ module Cinch
       listen_to :join,          :method => :voice_if_in_game
       listen_to :leaving,       :method => :remove_if_not_started
       listen_to :op,            :method => :devoice_everyone_on_start
-
 
       #--------------------------------------------------------------------------------
       # Listeners & Timers
@@ -141,13 +145,16 @@ module Cinch
           #   User(m.user).send "!rules - provides rules for the game"
           # else
             User(m.user).send "--- HELP PAGE 1/3 ---"
-            User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
-            User(m.user).send "!unlynch - revoke your existing lynch vote, if any"
-            User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
             User(m.user).send "!rules (rolecount|onuwwroles|nightorder) - provides rules for the game; when provided with an argument, provides specified rules"
+            User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
+            User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
+            User(m.user).send "!unlynch - revoke your existing lynch vote, if any"
+            User(m.user).send "!claim (role) - claim a role"
+            User(m.user).send "!unclaim - revoke your existing role claim, if any"
+            User(m.user).send "!claims - show the list of current role claims"
           # end
         end
       end
@@ -266,7 +273,6 @@ module Cinch
           User(m.user).send "You are not subscribed to the invitation list."
         end
       end
-
 
       #--------------------------------------------------------------------------------
       # Main IRC Interface Methods
@@ -433,6 +439,45 @@ module Cinch
         if @game.all_lynch_votes_in?
           self.do_end_game
         end
+      end
+
+      def claim_role(m, role_string)
+        if @game.started? && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          role = @game.parse_role(role_string)
+
+          if role.nil?
+            User(m.user).send "\"#{role_string}\" is an invalid role."
+          else
+            @game.claim_role(player, role)
+            User(m.user).send "You have claimed the role of #{role.to_s}."
+          end
+        end
+      end
+
+      def unclaim_role(m)
+        if @game.started? && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          previously_claimed_role = @game.claims[player]
+
+          if previously_claimed_role.nil?
+            User(m.user).send "You have not claimed a role."
+          else
+            @game.unclaim_role(player)
+            User(m.user).send "Your claim of #{previously_claimed_role} has been revoked."
+          end
+        end
+      end
+
+      def list_claims(m)
+        claims_message = @game.players.map{ |player|
+          if @game.claims[player].nil?
+            "#{player} - no claim"
+          else
+            "#{player} - #{@game.claims[player].upcase}"
+          end
+        }.join(', ')
+        Channel(@channel_name).send "Claims: #{claims_message}"
       end
 
       def confirm_role(m)
@@ -687,7 +732,7 @@ module Cinch
               User(player.user).send "You remain the #{player.role.upcase}"
             elsif player.action_take.has_key?(:thiefplayer)
               target_player = player.action_take[:thiefplayer]
-              
+
               player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
               User(player.user).send "You are now a #{player.action_take[:thiefplayer].role.upcase}."
             end
@@ -874,18 +919,18 @@ module Cinch
 
 
         # show ending role result
-        roles_msg = @game.players.map{ |player| 
+        roles_msg = @game.players.map{ |player|
           if (player.role != player.cur_role || player.old_doppelganger?)
             if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)
               Format(:bold, "#{player} - #{player.cur_role.upcase}-#{@game.doppelganger_role.upcase}")
             else
-              Format(:bold, "#{player} - #{player.cur_role.upcase}") 
+              Format(:bold, "#{player} - #{player.cur_role.upcase}")
             end
           else
             "#{player} - #{player.cur_role.upcase}"
           end
         }.join(', ')
-          
+
         Channel(@channel_name).send "Ending Roles: #{roles_msg}"
 
         unless @game.old_doppelganger.nil?
@@ -1216,9 +1261,6 @@ module Cinch
 
         changelog
       end
-
-
     end
-
   end
 end
