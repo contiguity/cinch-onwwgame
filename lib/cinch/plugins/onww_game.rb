@@ -477,7 +477,7 @@ module Cinch
             "#{player} - #{@game.claims[player].upcase}"
           end
         }.join(', ')
-        Channel(@channel_name).send "Claims: #{claims_message}"
+        m.reply "Claims: #{claims_message}"
       end
 
       def confirm_role(m)
