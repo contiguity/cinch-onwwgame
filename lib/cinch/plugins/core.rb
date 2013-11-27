@@ -7,8 +7,6 @@ require 'json'
 $player_count = 0
 
 class Game
-
-
   MIN_PLAYERS = 3
   MAX_PLAYERS = 6
   ONUWW_MAX_PLAYERS = 10
@@ -17,7 +15,7 @@ class Game
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
 
-  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :invitation_sent
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent
 
   def initialize
     self.started         = false
@@ -31,6 +29,7 @@ class Game
     self.phase           = :night # starts on night phase
     self.subphase        = 1
     self.lynch_votes     = {}
+    self.claims          = {}
   end
 
   #----------------------------------------------
@@ -48,7 +47,6 @@ class Game
   def accepting_players?
     self.not_started? && ! self.at_max_players?
   end
-
 
   #----------------------------------------------
   # Game Setup
@@ -176,6 +174,15 @@ class Game
     self.table_cards = gameroles
   end
 
+  # Claims
+
+  def claim_role(player, role)
+    self.claims[player] = role
+  end
+
+  def unclaim_role(player)
+    self.claims.delete(player)
+  end
 
   # Lynch votes
 
@@ -216,7 +223,6 @@ class Game
     end
     totals
   end
-
 
   def check_game_state
     if self.started? && self.day?
@@ -315,6 +321,33 @@ class Game
     self.players.find{ |p| p.old_doppelganger? }.doppelganger_look[:dgrole]
   end
 
+  def parse_role(role_string)
+    case role_string
+    when "dg", "doppelganger"
+      role = :doppelganger
+    when "dk", "drunk"
+      role = :drunk
+    when "i", "insomniac"
+      role = :insomniac
+    when "msn", "mason"
+      role = :mason
+    when "mnn", "minion"
+      role = :minion
+    when "rbr", "robber"
+      role = :robber
+    when "sr", "seer"
+      role = :seer
+    when "tm", "troublemaker"
+      role = :troublemaker
+    when "tnr", "tanner"
+      role = :tanner
+    when "v", "vgr", "villager"
+      role = :villager
+    when "ww", "werewolf"
+      role = :werewolf
+    end
+    role
+  end
 end
 
 #================================================================================

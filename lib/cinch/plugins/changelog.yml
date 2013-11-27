@@ -6,10 +6,11 @@
   changes:
     - "Fixed robber end game output"
     - "Show dg-role in final roles output"
+    - "Added claim functionality"
 - date: "2013-11-25"
   changes:
     - "Fixed hunter bug"
-    - "Added the ability to revoke a lynch vote."
+    - "Added the ability to revoke a lynch vote"
 - date: "2013-11-24"
   changes:
     - "Fixed lynched output"
