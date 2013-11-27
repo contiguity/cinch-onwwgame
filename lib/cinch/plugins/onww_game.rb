@@ -351,7 +351,8 @@ module Cinch
         Channel(@channel_name).send "The game has started."
         if @game.onuww?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
-          Channel(@channel_name).send "Using roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
+          roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
+          Channel(@channel_name).send "Using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}" 
           Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}"
         end
 
@@ -1097,9 +1098,20 @@ module Cinch
                   "#{player} - #{player.role.upcase}"
                 end
               end.join(', ')
+              User(m.user).send "Roles: #{self.game_settings[:roles].sort.join(", ")}" if @game.variants.include?(:blindrandom)
               User(m.user).send "Starting Roles: #{roles_msg}"
               if @game.day?
-                roles_msg = @game.players.map{ |player| player.role != player.cur_role || player.old_doppelganger? ? Format(:bold, "#{player} - #{player.cur_role.upcase}") : "#{player} - #{player.cur_role.upcase}" }.join(', ')
+                roles_msg = @game.players.map{ |player|
+                if (player.role != player.cur_role || player.old_doppelganger?)
+                  if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)
+                    Format(:bold, "#{player} - #{player.cur_role.upcase}-#{@game.doppelganger_role.upcase}")
+                  else
+                    Format(:bold, "#{player} - #{player.cur_role.upcase}")
+                  end
+                else
+                  "#{player} - #{player.cur_role.upcase}"
+                end
+                }.join(', ')
                 User(m.user).send "Current Roles: #{roles_msg}"
                 player = @game.find_player_by_role(:seer)
                 unless player.nil?
@@ -1125,7 +1137,8 @@ module Cinch
       def get_game_settings(m)
         with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
         if @game.onuww?
-          m.reply "Game settings: ONUWW. Using #{self.game_settings[:roles].count} roles: #{self.game_settings[:roles].sort.join(", ")}.#{with_variants}"
+          roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
+          m.reply "Game settings: ONUWW. Using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}"
         else
           m.reply "Game settings: base.#{with_variants}"
         end
@@ -1140,8 +1153,9 @@ module Cinch
           options = game_options || ""
           options = options.downcase.split(" ")
           if game_type.downcase == "onuww"
-            valid_role_options    = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "masons"]
-            valid_variant_options = ["lonewolf"]
+            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "masons"]
+            valid_variant_options     = ["lonewolf", "random", "blindrandom"]
+            valid_random_role_options = ["villager", "villager", "villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger"]
 
             role_options    = options.select{ |opt| valid_role_options.include?(opt) }
             variant_options = options.select{ |opt| valid_variant_options.include?(opt) }
@@ -1150,19 +1164,44 @@ module Cinch
               role_options -= ["masons"]
               role_options += ["mason"]
             end
-            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) && !valid_variant_options.include?(opt)}
-            if !game_options.nil?
-              roles = role_options
-              valid_role_options.map{ |vr|
-                if (vr == "werewolf" && !roles.include?("werewolf"))
-                  role_options = nil
-                  Channel(@channel_name).send "You must include at least one werewolf."
-                elsif (vr !="werewolf" && vr != "villager" && vr != "mason" && roles.count(vr) > 1) || (vr == "werewolf" && (roles.count(vr) > 2)) || (vr == "villager" && roles.count(vr) > 3) || (vr == "mason" && roles.count("mason") > 2)
-                  role_options = nil
-                  Channel(@channel_name).send "You have included #{vr} too many times."
-                end
 
-              }
+            if variant_options.include?("random") && variant_options.include?("blindrandom")
+              role_options = nil
+              game_options = nil
+              Channel(@channel_name).send "You cannot specify both random and blindrandom."
+            elsif (variant_options.include?("random") || variant_options.include?("blindrandom"))
+              if !role_options.empty?
+                game_options = nil
+                role_options = nil
+                Channel(@channel_name).send "You cannot specify roles when using random or blindrandom"
+              elsif variant_options.include?("random")
+                roles = valid_random_role_options.sample(@game.player_count+2)
+                if (roles.include?("mason") && roles.count("mason") == 1)
+                  roles = roles.reject{|r| r == "mason"}.sample(@game.player_count)
+                  roles += ["mason"]
+                end
+                roles += ["werewolf"]
+                role_options = roles
+              elsif variant_options.include?("blindrandom")
+                valid_random_role_options += ["werewolf", "mason"]
+                roles = valid_random_role_options.sample(@game.player_count+3)
+                role_options = roles 
+              end
+            end
+            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) && !valid_variant_options.include?(opt)}
+            unless game_options.nil?
+              roles = role_options
+              unless variant_options.include?("blindrandom")
+                valid_role_options.map{ |vr|
+                  if (vr == "werewolf" && !roles.include?("werewolf"))
+                    role_options = nil
+                    Channel(@channel_name).send "You must include at least one werewolf."
+                  elsif (vr !="werewolf" && vr != "villager" && vr != "mason" && roles.count(vr) > 1) || (vr == "werewolf" && (roles.count(vr) > 2)) || (vr == "villager" && roles.count(vr) > 3) || (vr == "mason" && roles.count("mason") > 2)
+                    role_options = nil
+                    Channel(@channel_name).send "You have included #{vr} too many times."
+                  end
+                }
+              end
               if unknown_options.count > 0
                 Channel(@channel_name).send "Unknown roles specified: #{unknown_options.join(", ")}."
               end
@@ -1170,9 +1209,10 @@ module Cinch
               roles = ["werewolf", "werewolf", "seer", "robber", "troublemaker", "villager"]
             end
             unless role_options.nil?
-              roles += ["mason"] if (roles.include?("mason") && roles.count("mason") == 1)
+              roles += ["mason"] if (roles.include?("mason") && roles.count("mason") == 1 && !variant_options.include?("blindrandom"))
               @game.change_type :onuww, :roles => roles, :variants => variant_options
-              game_type_message = "#{game_change_prefix} to ONUWW. Using #{self.game_settings[:roles].count} roles: #{self.game_settings[:roles].sort.join(", ")}."
+              roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}" 
+              game_type_message = "#{game_change_prefix} to ONUWW. Using #{self.game_settings[:roles].count} #{roles_msg}."
             end
           else
             @game.change_type :base
@@ -1189,6 +1229,8 @@ module Cinch
         settings[:variants] = []
         if @game.onuww?
           settings[:variants] << "Lone Wolf" if @game.variants.include?(:lonewolf)
+          settings[:variants] << "Random" if @game.variants.include?(:random)
+          settings[:variants] << "Blind Random" if @game.variants.include?(:blindrandom)
         else
           #do other stuff
         end

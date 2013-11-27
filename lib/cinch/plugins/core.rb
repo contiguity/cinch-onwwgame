@@ -424,8 +424,10 @@ class Player
   end
 
   def dg_role?(role)
-    unless self.doppelganger_look.nil?
-      self.doppelganger_look[:dgrole] == role
+    if self.doppelganger?
+      unless self.doppelganger_look.nil?
+        self.doppelganger_look[:dgrole] == role
+      end
     end
   end
 
