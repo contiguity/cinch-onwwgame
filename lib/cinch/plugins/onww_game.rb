@@ -658,7 +658,7 @@ module Cinch
           player = @game.find_player(m.user)
           if player.doppelganger?
             target_player = @game.find_player(look)
-            if player.confirmed?
+            if player.confirmed? || !player.doppelganger_look.nil?
               User(m.user).send "You have already confirmed your action."
             elsif target_player.nil?
               User(m.user).send "\"#{look}\" is an invalid target."

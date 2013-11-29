@@ -1,3 +1,6 @@
+- date: "2013-11-29"
+  changes:
+    - "Fixed bug allowing doppel to look multiple times"
 - date: "2013-11-27"
   changes:
     - "Fixed doppel showing on werewolf team"
