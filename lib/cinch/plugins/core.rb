@@ -327,6 +327,8 @@ class Game
       role = :doppelganger
     when "dk", "drunk"
       role = :drunk
+    when "h", "hunter"
+      role = :hunter
     when "i", "insomniac"
       role = :insomniac
     when "msn", "mason"

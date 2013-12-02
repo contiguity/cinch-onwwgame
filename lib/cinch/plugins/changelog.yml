@@ -1,3 +1,6 @@
+- date: "2013-12-02"
+  changes:
+    - "Added hunter to role claims"
 - date: "2013-11-29"
   changes:
     - "Fixed bug allowing doppel to look multiple times"
