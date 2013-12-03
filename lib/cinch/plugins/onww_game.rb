@@ -780,6 +780,8 @@ module Cinch
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.action_take.has_key?(:seerplayer)
+            target_player = player.action_take[:seerplayer]
+            player.action_take[:seerplayerrole] = target_player.cur_role
             User(player.user).send "#{player.action_take[:seerplayer]} is #{player.action_take[:seerplayer].cur_role.upcase}."
           elsif player.action_take.has_key?(:seertable)
             if @game.onuww?
@@ -878,7 +880,7 @@ module Cinch
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.action_take.has_key?(:seerplayer)
-            Channel(@channel_name).send "SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
+            Channel(@channel_name).send "SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayerrole].upcase}"
           elsif player.action_take.has_key?(:seertable)
             Channel(@channel_name).send "SEER looked at the table and saw: #{player.action_take[:seertable]}"
           end

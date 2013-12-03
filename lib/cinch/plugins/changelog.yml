@@ -1,3 +1,6 @@
+- date: "2013-12-03"
+  changes:
+    - "Fixed seer end game output"
 - date: "2013-12-02"
   changes:
     - "Added hunter to role claims"
