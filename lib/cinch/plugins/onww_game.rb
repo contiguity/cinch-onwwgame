@@ -144,7 +144,7 @@ module Cinch
           #   User(m.user).send "--- HELP PAGE 3/3 ---"
           #   User(m.user).send "!rules - provides rules for the game"
           # else
-            User(m.user).send "--- HELP PAGE 1/3 ---"
+            User(m.user).send "--- HELP PAGE 1/1 ---"
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
