@@ -411,8 +411,10 @@ module Cinch
       end
 
       def run_game_timer
-        if [5, 2, 1].any?{|i| i == @game_timer.shots}
+        if [5, 2].any?{|i| i == @game_timer.shots}
           Channel(@channel_name).send "*** #{@game_timer.shots} MINUTES LEFT *** "
+        elsif @game_timer.shots == 1
+          Channel(@channel_name).send "*** 1 MINUTE LEFT *** "
         elsif @game_timer.shots == 0
           Channel(@channel_name).send "*** TIME IS UP! ***"
           Channel(@channel_name).send "Vote for a player to be lynched via bot private message."
