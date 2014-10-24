@@ -39,7 +39,6 @@ module Cinch
       # game
       #match /whoami/i,           :method => :whoami
       # !nightorder
-      # !who
       # !roleset
 
       # timer
@@ -76,6 +75,7 @@ module Cinch
       match /vote (.+)/i,         :method => :lynch_vote
       match /unlynch/i,           :method => :revoke_lynch_vote
       match /status/i,            :method => :status
+      match /who$/i,              :method => :list_players
       match /confirm/i,           :method => :confirm_role
 
       # other
@@ -201,7 +201,7 @@ module Cinch
         if @game.players.empty?
           m.reply "No one has joined the game yet."
         else
-          m.reply @game.players.map{ |p| p == @game.hammer ? "#{dehighlight_nick(p.user.nick)}*" : dehighlight_nick(p.user.nick) }.join(' ')
+          m.reply @game.players.map{ |p| p.user.nick }.join(' ')
         end
       end
 
