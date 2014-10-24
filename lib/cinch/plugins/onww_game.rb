@@ -73,6 +73,7 @@ module Cinch
       match /look ?(.+)?/i,       :method => :doppelganger_look
 
       match /lynch (.+)/i,        :method => :lynch_vote
+      match /vote (.+)/i,         :method => :lynch_vote
       match /unlynch/i,           :method => :revoke_lynch_vote
       match /status/i,            :method => :status
       match /confirm/i,           :method => :confirm_role
@@ -87,7 +88,7 @@ module Cinch
       match /settings$/i,           :method => :get_game_options
       match /settings (base|ultimate)/i, :method => :set_game_options
       match /roleset (set|add|remove) (.+)/i, :method => :set_game_roles
-      match /roleset$/i, :method => :get_game_roles
+      match /roleset$/i,            :method => :get_game_roles
 
       match /changelog$/i,          :method => :changelog_dir
       match /changelog (\d+)/i,     :method => :changelog
@@ -98,7 +99,7 @@ module Cinch
       match /replace (.+?) (.+)/i, :method => :replace_user
       match /kick (.+)/i,          :method => :kick_user
       match /room (.+)/i,          :method => :room_mode
-      match /roles/i,              :method => :what_roles
+      match /roles$/i,             :method => :what_roles
 
       listen_to :join,          :method => :voice_if_in_game
       listen_to :leaving,       :method => :remove_if_not_started
@@ -1235,9 +1236,9 @@ module Cinch
 
       def check_timer(m)
         if @game_timer
-          Channel(@channel_name).send "Timer: #{@game_timer.shots}"
+           m.reply "Timer: #{@game_timer.shots}"
         else
-          Channel(@channel_name).send "There is no timer running for this game."
+           m.reply "There is no timer running for this game."
         end
       end
 
@@ -1371,7 +1372,7 @@ module Cinch
         game_type_message = "Using #{self.game_settings[:roles].count} #{roles_msg}."
           
         with_variants = self.game_settings[:variants].empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
-        Channel(@channel_name).send "#{game_type_message}#{with_variants}"
+         m.reply "#{game_type_message}#{with_variants}"
       end
 
       def game_settings
