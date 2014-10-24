@@ -59,7 +59,7 @@ class Game
   # Player handlers
 
   def max_players
-    if self.onuww?
+    if self.ultimate?
       ONUWW_MAX_PLAYERS
     else
       MAX_PLAYERS
@@ -67,7 +67,7 @@ class Game
   end
 
   def at_max_players?
-    if self.onuww?
+    if self.ultimate?
       self.player_count == ONUWW_MAX_PLAYERS
     else
       self.player_count == MAX_PLAYERS
@@ -163,7 +163,7 @@ class Game
   #
   def pass_out_roles
     # assign loyalties
-    if self.onuww?
+    if self.ultimate?
       gameroles = self.roles.dup
     else
       extra_players = self.player_count - MIN_PLAYERS

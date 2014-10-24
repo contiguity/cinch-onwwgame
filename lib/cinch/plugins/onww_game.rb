@@ -26,6 +26,9 @@ module Cinch
         @invite_timer_length  = config[:invite_reset]
 
         @idle_timer   = self.start_idle_timer
+
+        @game_timer_minutes   = nil
+        @game_timer   = nil
       end
 
       # start
@@ -38,6 +41,11 @@ module Cinch
       # !nightorder
       # !who
       # !roleset
+
+      # timer
+      match /timer set (\d+)/i,   :method => :set_timer 
+      match /timer off$/i,        :method => :turn_off_timer 
+      match /timer$/i,            :method => :check_timer 
 
       # claims
       match /claim (.+)/i,        :method => :claim_role
@@ -79,6 +87,7 @@ module Cinch
       match /settings$/i,           :method => :get_game_options
       match /settings (base|ultimate)/i, :method => :set_game_options
       match /roleset (set|add|remove) (.+)/i, :method => :set_game_roles
+      match /roleset$/i, :method => :get_game_roles
 
       match /changelog$/i,          :method => :changelog_dir
       match /changelog (\d+)/i,     :method => :changelog
@@ -359,6 +368,7 @@ module Cinch
         @idle_timer.stop
 
         Channel(@channel_name).send "The game has started."
+        Channel(@channel_name).send "Timer set to #{@game_timer_minutes.to_s} minutes." unless @game_timer_minutes.nil?
         if @game.ultimate?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
           roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
@@ -390,6 +400,27 @@ module Cinch
         Channel(@channel_name).moderated = false
         @game.players.each do |p|
           Channel(@channel_name).voice(p.user)
+        end
+
+        unless @game_timer_minutes.nil?
+          @game_timer = Timer(60, shots: @game_timer_minutes) do
+            self.run_game_timer
+          end
+        end
+      end
+
+      def run_game_timer
+        if [5, 2, 1].any?{|i| i == @game_timer.shots}
+          Channel(@channel_name).send "*** #{@game_timer.shots} MINUTES LEFT *** "
+        elsif @game_timer.shots == 0
+          Channel(@channel_name).send "*** TIME IS UP! ***"
+          Channel(@channel_name).send "Vote for a player to be lynched via bot private message."
+          Channel(@channel_name).moderated = true
+          Channel(@channel_name).voiced.each do |user|
+            Channel(@channel_name).devoice(user)
+          end
+
+          ## MESSAGE UNVOTED PLAYERS!
         end
       end
 
@@ -1039,6 +1070,7 @@ module Cinch
         end
         @game = Game.new
         @idle_timer.start
+        @game_timer_minutes = nil
       end
 
 
@@ -1084,6 +1116,7 @@ module Cinch
           self.devoice_channel
           Channel(@channel_name).send "The game has been reset."
           @idle_timer.start
+          @game_timer_minutes = nil
         end
       end
 
@@ -1185,11 +1218,34 @@ module Cinch
       # Settings
       #--------------------------------------------------------------------------------
 
-      def get_game_settings(m)
+      def set_timer(m, minutes)
+        min = minutes.to_i
+        if min.is_a?(Integer) && min > 0
+          @game_timer_minutes = min
+          Channel(@channel_name).send "Timer set to #{minutes} minutes."
+        else 
+          Channel(@channel_name).send "That's not a valid number."
+        end
+      end
+
+      def turn_off_timer(m)
+        @game_timer_minutes = nil
+        Channel(@channel_name).send "Timer turned off."
+      end
+
+      def check_timer(m)
+        if @game_timer
+          Channel(@channel_name).send "Timer: #{@game_timer.shots}"
+        else
+          Channel(@channel_name).send "There is no timer running for this game."
+        end
+      end
+
+      def get_game_options(m)
         with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
         if @game.ultimate?
           roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
-          m.reply "Game settings: ONUWW. Using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}"
+          m.reply "Game settings: Ultimate. Using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}"
         else
           m.reply "Game settings: base.#{with_variants}"
         end
@@ -1308,6 +1364,14 @@ module Cinch
             Channel(@channel_name).send "Must be set to \"ultimate\" to work."
           end
         end
+      end
+
+      def get_game_roles(m)
+        roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}" 
+        game_type_message = "Using #{self.game_settings[:roles].count} #{roles_msg}."
+          
+        with_variants = self.game_settings[:variants].empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
+        Channel(@channel_name).send "#{game_type_message}#{with_variants}"
       end
 
       def game_settings
