@@ -1,3 +1,11 @@
+- date: "2014-10-24"
+  changes:
+    - "Renamed 'onuww' to 'ultimate'"
+    - "Changed default settings of games to 'ultimate'"
+    - "Added a TIMER, '!timer set #', '!timer off', '!timer'"
+    - "Added !vote as an alternative to !lynch"
+    - "Added a !who command to list players"
+    - "More versatile roleset modification with !roleset set/add/remove"
 - date: "2013-12-03"
   changes:
     - "Fixed seer end game output"
