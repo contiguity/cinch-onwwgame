@@ -14,14 +14,18 @@ class Game
   BASE_ROLES = [
       :werewolf, :werewolf, :seer, :thief, :villager
     ]
+  DEFAULT_ULTIMATE_ROLES = [
+      :werewolf, :werewolf, :seer, :robber, :troublemaker, :villager
+    ]
+
 
   attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent
 
   def initialize
     self.started         = false
     self.players         = []
-    self.type            = :base
-    self.roles           = []
+    self.type            = :ultimate
+    self.roles           = DEFAULT_ULTIMATE_ROLES
     self.variants        = []
     self.invitation_sent = false
     self.player_cards    = []
@@ -101,7 +105,7 @@ class Game
 
   def change_type(type, options = {})
     self.type = type
-    if type == :onuww
+    if type == :ultimate
       self.roles    = options[:roles].map(&:to_sym)
       unless options[:variants].nil?
         self.variants = options[:variants].map(&:to_sym)
@@ -116,8 +120,8 @@ class Game
     end
   end
 
-  def onuww?
-    self.type == :onuww
+  def ultimate?
+    self.type == :ultimate
   end
 
   def with_variant?(variant)
