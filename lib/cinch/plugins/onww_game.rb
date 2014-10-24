@@ -1236,7 +1236,7 @@ module Cinch
 
       def check_timer(m)
         if @game_timer
-           m.reply "Timer: #{@game_timer.shots}"
+           m.reply "Timer: #{@game_timer.shots} minutes remaining."
         else
            m.reply "There is no timer running for this game."
         end
