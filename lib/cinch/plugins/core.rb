@@ -313,8 +313,20 @@ class Game
     self.players.select{ |p| p.hunter? }
   end
 
+  def prince
+    self.players.select{ |p| p.prince? }
+  end
+
+  def bodyguard
+    self.players.select{ |p| p.bodyguard? }
+  end
+
+  def protected
+  	self.players.select{ |p| p.prince? || bodyguard.map{|bg| self.lynch_votes[bg]}.include?(p) }
+  end
+
   def non_special
-    self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.mason? || p.insomniac? || p.minion? }
+    self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.prince? || p.bodyguard? || p.mason? || p.insomniac? || p.minion? }
   end
 
   def old_doppelganger
@@ -327,6 +339,8 @@ class Game
 
   def parse_role(role_string)
     case role_string
+    when "bg", "bodyguard"
+      role = :bodyguard
     when "dg", "doppelganger"
       role = :doppelganger
     when "dk", "drunk"
@@ -339,6 +353,8 @@ class Game
       role = :mason
     when "mnn", "minion"
       role = :minion
+    when "pr", "prince"
+      role = :prince
     when "rbr", "robber"
       role = :robber
     when "sr", "seer"
@@ -422,6 +438,14 @@ class Player
     self.role == :hunter
   end
 
+  def prince?
+    self.role == :prince
+  end
+
+  def bodyguard?
+    self.role == :bodyguard
+  end
+
   def mason?
     self.role == :mason
   end
@@ -439,7 +463,7 @@ class Player
   end
 
   def good?
-    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
+    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
   end
 
   def evil?
@@ -447,11 +471,11 @@ class Player
   end
 
   def non_special?
-    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.mason? || self.insomniac? || self.minion?
+    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.prince? || self.bodyguard? || self.mason? || self.insomniac? || self.minion?
   end
 
   def dg_non_special?
-    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion)
+    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role(:prince) || self.dg_role?(:bodyguard) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion)
   end
 
   def confirmed?

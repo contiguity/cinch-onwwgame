@@ -739,7 +739,7 @@ module Cinch
           loyalty_msg = "You are the ROBBER. Do you want to take a role? \"!rob [player]\" or \"!norob\""
         when :troublemaker
           loyalty_msg = "You are the TROUBLEMAKER. Do you want to switch the roles of two players? \"!switch [player1] [player2]\" or \"!noswitch\""
-        when :tanner, :drunk, :hunter, :insomniac, :minion
+        when :tanner, :drunk, :hunter, :prince, :bodyguard, :insomniac, :minion
           loyalty_msg = "You are the #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :doppelganger
           loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player]\""
@@ -993,13 +993,16 @@ module Cinch
         lynch_totals = lynch_totals.sort_by{ |vote, voters| voters.size }.reverse
 
         lynch_msg = lynch_totals.map do |voted, voters|
-          "#{voters.count} - #{voted} (#{voters.join(', ')})"
+          "#{voters.count} - #{voted}#{voted.prince? ? '*' : ''} (#{voters.map{|voter| "#{voter}#{voter.bodyguard? ? '*' : ''}"}.join(', ')})"
         end.join(', ')
         Channel(@channel_name).send "Final Votes: #{lynch_msg}"
 
-        #grab the first person lynched and see if anyone else matches them
-        first_lynch = lynch_totals.first
-        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
+        # Remove players who are either a prince or were voted for by a bodyguard
+		can_lynch = lynch_totals.reject { |voted, voters| @game.protected.include?(voted) }
+
+        # grab the first person lynched and see if anyone else matches them
+        first_lynch = can_lynch.first
+        lynching = can_lynch.select { |voted, voters| voters.count == first_lynch[1].count }
         lynching = lynching.map{ |voted, voters| voted}
 
         # Check for hunter and add their target
@@ -1008,6 +1011,8 @@ module Cinch
             @game.lynch_votes[lynched] if lynched.hunter?
           }
           hunter_target.reject! { |r| r.nil? }
+          # prince and players pointed at by the bodyguard still cannot be killed
+          hunter_target.reject! { |p| @game.protected.include?(p) }
           (lynching+=hunter_target).uniq!
         end
 
@@ -1018,16 +1023,18 @@ module Cinch
             @game.lynch_votes[lynched] if lynched.hunter?
           }
           hunter_target.reject! { |r| r.nil? }
+          # prince and players pointed at by the bodyguard still cannot be killed
+          hunter_target.reject! { |p| @game.protected.include?(p) }
           Channel(@channel_name).send "HUNTER chooses: #{hunter_target.join(', ')}."
           (lynching+=hunter_target).uniq!
         end
 
-        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : "#{lynching.join(', ')}!"
+        lynched_players = (!first_lynch || first_lynch[1].count == 1) ? "No one is lynched!" : "#{lynching.join(', ')}!"
         Channel(@channel_name).send "Lynched players: #{lynched_players}"
 
         # return victory result
         # we lynched someone
-        if first_lynch[1].count > 1
+        if first_lynch && first_lynch[1].count > 1
           # werewolf lynched villagers win
           if lynching.detect { |l| l.werewolf? }
             if lynching.detect { |l| l.tanner? }
@@ -1287,7 +1294,7 @@ module Cinch
               options = roles.downcase.split(" ")
             end
 
-            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "doppleganger", "masons"]
+            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "prince", "bodyguard", "mason", "insomniac", "minion", "doppelganger", "doppleganger", "masons"]
             valid_variant_options     = ["lonewolf", "random", "blindrandom"]
             valid_random_role_options = ["villager", "villager", "villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger"]
 
