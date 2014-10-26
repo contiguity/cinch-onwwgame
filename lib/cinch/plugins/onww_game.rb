@@ -166,6 +166,7 @@ module Cinch
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
+			User(m.user).send "!roleset (set|add|remove) [role|variant ...] - sets, adds to, or removes from the roleset or variants"
             User(m.user).send "!rules (rolecount|onuwwroles|nightorder) - provides rules for the game; when provided with an argument, provides specified rules"
             User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!lynch (player) - vote for the player you wish to lynch"

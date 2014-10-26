@@ -1,7 +1,8 @@
 - date: "2014-10-25"
   changes:
     - "Added prince and bodyguard"
-	- "Added apprentice seer"
+    - "Added apprentice seer"
+    - "Added line on '!roleset' to !help"
 - date: "2014-10-24"
   changes:
     - "Renamed 'onuww' to 'ultimate'"
