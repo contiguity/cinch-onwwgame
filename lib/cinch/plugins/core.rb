@@ -21,11 +21,11 @@ class Game
 
   attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent
 
-  def initialize
+  def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
     self.players         = []
     self.type            = :ultimate
-    self.roles           = DEFAULT_ULTIMATE_ROLES
+    self.roles           = init_roles
     self.variants        = []
     self.invitation_sent = false
     self.player_cards    = []

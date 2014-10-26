@@ -4,6 +4,7 @@
     - "Added apprentice seer"
     - "Added line on '!roleset' to !help"
     - "Added dream wolf and cursed"
+    - "Maintain roleset between games"
 - date: "2014-10-24"
   changes:
     - "Renamed 'onuww' to 'ultimate'"

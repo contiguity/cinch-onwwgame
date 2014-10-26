@@ -1166,7 +1166,7 @@ module Cinch
         @game.players.each do |p|
           Channel(@channel_name).devoice(p.user)
         end
-        @game = Game.new
+        @game = Game.new(@game.roles)
         @idle_timer.start
         @game_timer_minutes = nil
       end
