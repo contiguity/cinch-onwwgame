@@ -169,6 +169,7 @@ class Game
       extra_players = self.player_count - MIN_PLAYERS
       gameroles = BASE_ROLES + [:villager]*extra_players
     end
+	alpha_wolf = gameroles.include?(:alpha_wolf)
     gameroles.shuffle!
     self.players.each do |player|
       role = gameroles.shift
@@ -176,6 +177,9 @@ class Game
       player.receive_role( role )
     end
     self.table_cards = gameroles
+    if (alpha_wolf)
+      # TODO: add extra wolf for alpha wolf
+    end
   end
 
   # Claims
@@ -293,6 +297,14 @@ class Game
     self.players.select{ |p| p.werewolf? || p.dg_role?(:werewolf) }
   end
 
+  def wolves
+    self.players.select{ |p| p.wolf? || p.dg_role?(:werewolf) || p.dg_role?(:mystic_wolf) || p.dg_role?(:alpha_wolf) || p.dg_role?(:dream_wolf) }
+  end
+
+  def waking_wolves
+    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) }
+  end
+
   def humans
     self.players.select{ |p| p.good? }
   end
@@ -321,6 +333,10 @@ class Game
     self.players.select{ |p| p.bodyguard? }
   end
 
+  def cursed
+    self.players.select{ |p| p.cursed? }
+  end
+
   def apprentice_seer
     self.players.select{ |p| p.apprentice_seer? }
   end
@@ -334,7 +350,7 @@ class Game
   end
 
   def non_special
-    self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.prince? || p.bodyguard? || p.mason? || p.insomniac? || p.minion? }
+    self.players.select{ |p| p.non_special? }
   end
 
   def old_doppelganger
@@ -349,12 +365,18 @@ class Game
     case role_string
     when "as", "apprenticeseer", "apprentice_seer"
       role = :bodyguard
+    when "aw", "alphawolf", "alpha_wolf"
+	  role = :alpha_wolf
     when "bg", "bodyguard"
       role = :bodyguard
-    when "c", "curator"
+    when "ctr", "curator"
       role = :curator
+    when "csd", "cursed"
+      role = :cursed
     when "dg", "doppelganger"
       role = :doppelganger
+    when "dw", "dreamwolf", "dream_wolf"
+	  role = :dream_wolf
     when "dk", "drunk"
       role = :drunk
     when "h", "hunter"
@@ -365,6 +387,8 @@ class Game
       role = :mason
     when "mnn", "minion"
       role = :minion
+    when "mw", "mysticwolf", "mystic_wolf"
+	  role = :mystic_wolf
     when "pr", "prince"
       role = :prince
     when "rbr", "robber"
@@ -418,8 +442,24 @@ class Player
     self.role == :villager
   end
 
+  def wolf?
+    self.role == :werewolf || self.role == :mystic_wolf || self.role == :alpha_wolf || self.role == :dream_wolf
+  end
+
   def werewolf?
     self.role == :werewolf
+  end
+
+  def mystic_wolf?
+    self.role == :mystic_wolf
+  end
+
+  def alpha_wolf?
+    self.role == :alpha_wolf
+  end
+
+  def dream_wolf?
+    self.role == :dream_wolf
   end
 
   def seer?
@@ -440,6 +480,10 @@ class Player
 
   def tanner?
     self.role == :tanner
+  end
+
+  def cursed?
+    self.role == :cursed
   end
 
   def drunk?
@@ -483,19 +527,19 @@ class Player
   end
 
   def good?
-    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
+    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger, :apprentice_seer, :curator, :cursed].any?{ |role| role == self.role}
   end
 
   def evil?
-    [:werewolf, :minion].any?{ |role| role == self.role}
+    [:werewolf, :mystic_wolf, :alpha_wolf, :dream_wolf, :minion].any?{ |role| role == self.role}
   end
 
   def non_special?
-    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.prince? || self.bodyguard? || self.mason? || self.insomniac? || self.minion? || self.apprentice_seer?
+    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.prince? || self.bodyguard? || self.mason? || self.insomniac? || self.minion? || self.apprentice_seer? || self.cursed? || self.dream_wolf?
   end
 
   def dg_non_special?
-    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:prince) || self.dg_role?(:bodyguard) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion) || self.dg_role?(:apprentice_seer)
+    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:prince) || self.dg_role?(:bodyguard) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion) || self.dg_role?(:apprentice_seer) || self.dg_role?(:cursed) || self.dg_role?(:dream_wolf)
   end
 
   def confirmed?

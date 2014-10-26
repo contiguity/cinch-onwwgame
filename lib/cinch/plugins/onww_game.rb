@@ -775,18 +775,20 @@ module Cinch
 
       def tell_role_to(player)
         case player.cur_role
-        when :villager, :werewolf, :mason
+        when :villager, :werewolf, :mason, :tanner, :drunk, :hunter, :prince, :bodyguard, :insomniac, :minion, :apprentice_seer, :cursed, :dream_wolf
           loyalty_msg = "You are a #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :seer
           loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
+        when :mystic_wolf
+          loyalty_msg = "You are the MYSTIC_WOLF. Who do you want to view? \"!view [player]\""
+        when :alpha_wolf
+          loyalty_msg = "You are the ALPHA_WOLF. Do you want to turn someone into a wolf? \"!wolfify [player]\" or \"!nowolfify\""
         when :thief
           loyalty_msg = "You are the THIEF. Do you want to take a role? \"!thief [player]\", \"!tablethief\" or \"!nothief\""
         when :robber
           loyalty_msg = "You are the ROBBER. Do you want to take a role? \"!rob [player]\" or \"!norob\""
         when :troublemaker
           loyalty_msg = "You are the TROUBLEMAKER. Do you want to switch the roles of two players? \"!switch [player1] [player2]\" or \"!noswitch\""
-        when :tanner, :drunk, :hunter, :prince, :bodyguard, :insomniac, :minion, :apprentice_seer
-          loyalty_msg = "You are the #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :doppelganger
           loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player]\""
         end
@@ -837,9 +839,9 @@ module Cinch
           end
         end
 
-        unless @game.werewolves.nil?
-          @game.werewolves.each do |p|
-            other_wolf = @game.werewolves.reject{ |w| w == p }
+        unless @game.waking_wolves.nil?
+          @game.waking_wolves.each do |p|
+            other_wolf = @game.wolves.reject{ |w| w == p }
             reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
             User(p.user).send reveal_msg
             if (other_wolf.empty? && @game.with_variant?(:lonewolf))
@@ -974,9 +976,9 @@ module Cinch
           end
         end
 
-        if (@game.with_variant?(:lonewolf) && @game.werewolves.count == 1)
-          player = @game.find_player_by_role(:werewolf)
-          Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle"
+        if (@game.with_variant?(:lonewolf) && @game.wolves.count == 1)
+          player = @game.wolves[0]
+          Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle" unless player.dream_wolf?
         end
 
         player = @game.find_player_by_role(:seer)
@@ -1066,6 +1068,21 @@ module Cinch
         end.join(', ')
         Channel(@channel_name).send "Final Votes: #{lynch_msg}"
 
+        Channel(@channel_name).send "BODYGUARD#{@game.bodyguard.size > 1 ? "S protect" : " protects"} #{@game.bodyguard.map{|p| @game.lynch_votes[p]}.uniq.join(", ")}" unless @game.bodyguard.empty?
+
+        # find all cursed who became wolves and then make them wolves, in case a cursed votes for another cursed
+        curselist = []
+        lynch_totals.map do |voted, voters|
+          if voted.cursed? && voters.detect{|p| p.wolf?}
+            curselist.push voted
+          end
+        end
+
+        for player in curselist
+          Channel(@channel_name).send "CURSED #{player} becomes a wolf!"
+          player.role = :werewolf
+        end
+
         # Remove players who are either a prince or were voted for by a bodyguard
 		can_lynch = lynch_totals.reject { |voted, voters| @game.protected.include?(voted) }
 
@@ -1094,7 +1111,7 @@ module Cinch
           hunter_target.reject! { |r| r.nil? }
           # prince and players pointed at by the bodyguard still cannot be killed
           hunter_target.reject! { |p| @game.protected.include?(p) }
-          Channel(@channel_name).send "HUNTER chooses: #{hunter_target.join(', ')}."
+          Channel(@channel_name).send "HUNTER chooses: #{hunter_target.empty? ? "No one" : hunter_target.join(', ')}."
           (lynching+=hunter_target).uniq!
         end
 
@@ -1105,10 +1122,12 @@ module Cinch
         # we lynched someone
         if first_lynch && first_lynch[1].count > 1
           # werewolf lynched villagers win
-          if lynching.detect { |l| l.werewolf? }
+          if lynching.detect { |l| l.wolf? }
             if lynching.detect { |l| l.tanner? }
               dead_tanner = lynching.select{ |l| l.tanner? }
               Channel(@channel_name).send "Villager team and Tanner WIN! Villager Team: #{@game.humans.join(', ')}. Tanner: #{dead_tanner.join(', ')}."
+            elsif @game.humans.empty?
+              Channel(@channel_name).send "No one wins..."
             else
               Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
             end
@@ -1117,7 +1136,7 @@ module Cinch
             if lynching.detect { |l| l.tanner? }
               dead_tanner = lynching.select{ |l| l.tanner? }
               Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
-            elsif @game.werewolves.empty?
+            elsif @game.wolves.empty?
               if lynching.detect { |l| l.good? }
                 minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
@@ -1126,16 +1145,16 @@ module Cinch
               end
             else
               minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
-              Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
+              Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.wolves.join(', ')}.#{minion_msg}"
             end
           end
         # no one is lynched
         else
-          if @game.werewolves.empty?
+          if @game.wolves.empty?
             Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
           else
             minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
-            Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
+            Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.wolves.join(', ')}.#{minion_msg}"
           end
         end
 
@@ -1363,7 +1382,7 @@ module Cinch
               options = roles.downcase.split(" ")
             end
 
-            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "prince", "bodyguard", "apprentice_seer", "mason", "insomniac", "minion", "doppelganger", "doppleganger", "masons", "apprenticeseer"]
+            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "prince", "bodyguard", "cursed", "dream_wolf", "apprentice_seer", "mason", "insomniac", "minion", "doppelganger", "doppleganger", "masons", "apprenticeseer", "dreamwolf"]
             valid_variant_options     = ["lonewolf", "random", "blindrandom"]
             valid_random_role_options = ["villager", "villager", "villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "prince", "bodyguard", "apprentice_seer", "mason", "insomniac", "minion", "doppelganger"]
 
@@ -1384,6 +1403,11 @@ module Cinch
             if role_options.include?("apprenticeseer")
               role_options -= ["apprenticeseer"]
               role_options += ["apprentice_seer"]
+            end
+
+            if role_options.include?("dreamwolf")
+              role_options -= ["dreamwolf"]
+              role_options += ["dream_wolf"]
             end
 
             if action == 'remove'
