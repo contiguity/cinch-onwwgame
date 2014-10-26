@@ -321,6 +321,14 @@ class Game
     self.players.select{ |p| p.bodyguard? }
   end
 
+  def apprentice_seer
+    self.players.select{ |p| p.apprentice_seer? }
+  end
+
+  def curator
+    self.players.select{ |p| p.curator? }
+  end
+
   def protected
   	self.players.select{ |p| p.prince? || bodyguard.map{|bg| self.lynch_votes[bg]}.include?(p) }
   end
@@ -339,8 +347,12 @@ class Game
 
   def parse_role(role_string)
     case role_string
+    when "as", "apprenticeseer", "apprentice_seer"
+      role = :bodyguard
     when "bg", "bodyguard"
       role = :bodyguard
+    when "c", "curator"
+      role = :curator
     when "dg", "doppelganger"
       role = :doppelganger
     when "dk", "drunk"
@@ -446,6 +458,14 @@ class Player
     self.role == :bodyguard
   end
 
+  def apprentice_seer?
+    self.role == :apprentice_seer
+  end
+
+  def curator?
+    self.role == :curator
+  end
+
   def mason?
     self.role == :mason
   end
@@ -471,11 +491,11 @@ class Player
   end
 
   def non_special?
-    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.prince? || self.bodyguard? || self.mason? || self.insomniac? || self.minion?
+    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.prince? || self.bodyguard? || self.mason? || self.insomniac? || self.minion? || self.apprentice_seer?
   end
 
   def dg_non_special?
-    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role(:prince) || self.dg_role?(:bodyguard) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion)
+    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:prince) || self.dg_role?(:bodyguard) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion) || self.dg_role?(:apprentice_seer)
   end
 
   def confirmed?
