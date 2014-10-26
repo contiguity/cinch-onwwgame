@@ -1,3 +1,9 @@
+- date: "2014-10-26"
+  changes:
+    - "Centralized constants for types of roles"
+    - "Added framework for all Daybreak roles"
+    - "Implemented curator"
+    - "Bug fixes"
 - date: "2014-10-25"
   changes:
     - "Added prince and bodyguard"
