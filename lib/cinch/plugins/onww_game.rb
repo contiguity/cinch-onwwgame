@@ -1,7 +1,8 @@
 require 'cinch'
 require 'yaml'
 
-require File.expand_path(File.dirname(__FILE__)) + '/core'
+require_relative 'core'
+require_relative 'constants'
 
 module Cinch
   module Plugins
@@ -63,6 +64,10 @@ module Cinch
       # robber
       match /rob (.+)/i,          :method => :thief_take_player
       match /norob/i,             :method => :thief_take_none
+
+      # curator
+      match /gift (.+)/i,         :method => :curator_gift_player
+      match /nogift/i,       :method => :curator_gift_none
 
       # troublemaker
       match /switch (.+?) (.+)/i, :method => :troublemaker_switch
@@ -162,6 +167,7 @@ module Cinch
             User(m.user).send "!join - joins the game"
             User(m.user).send "!leave - leaves the game"
             User(m.user).send "!start - starts the game"
+            User(m.user).send "!roleset (set|add|remove) [role|variant ...] - sets, adds to, or removes from the roleset or variants"
             User(m.user).send "!rules (rolecount|onuwwroles|nightorder) - provides rules for the game; when provided with an argument, provides specified rules"
             User(m.user).send "!confirm - confirm your role (werewolves and villagers only)"
             User(m.user).send "!lynch (player) - vote for the player you wish to lynch"
@@ -186,7 +192,7 @@ module Cinch
           User(m.user).send "5 players: 2 werewolves, 3 villagers, 1 seer, 1 thief"
           User(m.user).send "6~7 players: 2 werewolves, 4 villagers, 1 seer, 1 thief"
         when "nightorder"
-          User(m.user).send "1: Doppelganger, 2: Werewolves, 3: Minion, 4: Masons, 5: Seer, 6: Robber, 7: Troublemaker, 8: Drunk, 9: Insomniac, 9a: Doppelganger/Insomniac"
+          User(m.user).send "1: Doppelganger, 2: Werewolves, 3: Minion, 4: Masons, 5: Seer, 5b: Apprentice Seer, 6: Robber, 7: Troublemaker, 8: Drunk, 9: Insomniac, 9a: Doppelganger/Insomniac, 11: Curator"
         when "onuwwroles"
           User(m.user).send "INSERT ONUWW ROLES HERE!"
         else
@@ -431,6 +437,8 @@ module Cinch
         @game.finish_subphase1
         self.night_reveal
 
+        self.inform_artifacts
+
         self.start_day_phase
       end
 
@@ -648,6 +656,78 @@ module Cinch
         end
       end
 
+      def curator_gift_player(m, gifted)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+
+          if (player.curator?)
+            target_player = @game.find_player(gifted)
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            elsif target_player.nil?
+              User(m.user).send "\"#{gifted}\" is an invalid target."
+            else
+              player.action_take = {:giftplayer => target_player}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_doppel_curator
+              self.check_for_day_phase
+            end
+          elsif (player.doppelganger? && player.cur_role == :curator)
+            target_player = @game.find_player(gifted)
+            curator = player.doppelganger_look[:dglook]
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            elsif !curator.confirmed?
+              User(m.user).send "Please wait for the curator to take their night action."
+            elsif target_player.nil?
+              User(m.user).send "\"#{gifted}\" is an invalid target."
+            elsif curator.action_take.has_key?(:giftplayer) && curator.action_take[:giftplayer] == target_player
+              User(m.user).send "#{target_player} already has an artifact."
+            else
+              player.action_take = {:giftplayer => target_player}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_for_day_phase
+            end
+          else
+            User(m.user).send "You are not the CURATOR."
+          end
+        end
+      end
+
+      def curator_gift_none(m)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+
+          if (player.curator?)
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            else
+              player.action_take = {:giftnone => "none"}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_doppel_curator
+              self.check_for_day_phase
+            end
+          elsif (player.doppelganger? && player.cur_role == :curator)
+            curator = player.doppelganger_look[:dglook]
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            elsif !curator.confirmed?
+              User(m.user).send "Please wait for the curator to take their night action."
+            else
+              player.action_take = {:giftnone => "none"}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_for_day_phase
+            end
+          else
+            User(m.user).send "You are not the CURATOR."
+          end
+        end
+      end
+
       def troublemaker_switch(m, switch1, switch2)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
@@ -729,32 +809,69 @@ module Cinch
 
       def tell_role_to(player)
         case player.cur_role
-        when :villager, :werewolf, :mason
+        when *NON_SPECIALS
           loyalty_msg = "You are a #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :seer
           loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
+        when :mystic_wolf
+          loyalty_msg = "You are the MYSTIC_WOLF. Who do you want to view? \"!view [player]\""
+        when :alpha_wolf
+          loyalty_msg = "You are the ALPHA_WOLF. Do you want to turn someone into a wolf? \"!wolfify [player]\" or \"!nowolfify\""
         when :thief
           loyalty_msg = "You are the THIEF. Do you want to take a role? \"!thief [player]\", \"!tablethief\" or \"!nothief\""
         when :robber
           loyalty_msg = "You are the ROBBER. Do you want to take a role? \"!rob [player]\" or \"!norob\""
+        when :curator
+          if (player.old_doppelganger?)
+            curator = player.doppelganger_look[:dglook]
+            if curator.action_take.has_key?(:giftnone)
+              loyalty_msg = "You are the DOPPELGANGER-CURATOR. There are no artifacts placed. Do you wish to give out an artifact? \"!gift [player]\" or \"!nogift\""
+            elsif curator.action_take.has_key?(:giftplayer)
+              if (curator.action_take.has_key?(:giftplayer) == player)
+                loyalty_msg = "You are the DOPPELGANGER-CURATOR. There is an artifact in front of you. Do you wish to give out an artifact? \"!gift [player]\" or \"!nogift\""
+              else
+                loyalty_msg = "You are the DOPPELGANGER-CURATOR. There is an artifact in front of #{curator.action_take[:giftplayer]}. Do you wish to give out an artifact? \"!gift [player]\" or \"!nogift\""
+              end
+            else
+              loyalty_msg = "You are the DOPPELGANGER-CURATOR. Please wait for the CURATOR to take their night action."
+            end
+          else
+          loyalty_msg = "You are the CURATOR. Do you wish to give out an artifact? \"!gift [player]\" or \"!nogift\""
+          end
         when :troublemaker
           loyalty_msg = "You are the TROUBLEMAKER. Do you want to switch the roles of two players? \"!switch [player1] [player2]\" or \"!noswitch\""
-        when :tanner, :drunk, :hunter, :insomniac, :minion
-          loyalty_msg = "You are the #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :doppelganger
           loyalty_msg = "You are the DOPPELGANGER. Who do you want to look at? \"!look [player]\""
         end
         User(player.user).send loyalty_msg
       end
 
+      def check_doppel_curator
+        for player in @game.doppelganger_curator
+          curator = player.doppelganger_look[:dglook]
+          if curator.action_take.has_key?(:giftnone)
+            loyalty_msg = "There are no artifacts placed."
+          elsif curator.action_take.has_key?(:giftplayer)
+            if (curator.action_take[:giftplayer] == player)
+              loyalty_msg = "There is an artifact in front of you."
+            else
+              loyalty_msg = "There is an artifact in front of #{curator.action_take[:giftplayer]}."
+            end
+          end
+          loyalty_msg << " Do you wish to give out an artifact? \"!gift [player]\" or \"!nogift\""
+          User(player.user).send loyalty_msg
+        end
+      end
+
       def night_reveal
+        artifacts = ARTIFACTS.keys.shuffle
         unless @game.old_doppelganger.nil?
           player = @game.old_doppelganger
           player.cur_role = player.role
           case @game.doppelganger_role
           when :minion
-            werewolves = @game.werewolves
-            reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for other werewolves and see: #{werewolves.join(", ")}."
+            werewolves = @game.wolves
+            reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for werewolves and see: #{werewolves.join(", ")}."
             User(player.user).send reveal_msg
           when :seer
             if player.action_take.has_key?(:seerplayer)
@@ -766,6 +883,9 @@ module Cinch
                 User(player.user).send "Middle is #{player.action_take[:seertable]}."
               end
             end
+          when :apprentice_seer
+            player.action_take[:apprentice_seer] = @game.table_cards.shuffle.first
+            User(player.user).send "One of the middle cards is: #{player.action_take[:apprentice_seer]}."
           when :robber
             if player.action_take.has_key?(:thiefnone)
               User(player.user).send "You remain the #{player.role.upcase}"
@@ -785,12 +905,21 @@ module Cinch
             player.cur_role = newrole
             player.action_take = {:drunk => newrole}
             User(player.user).send "You have exchanged your card with a card from the middle."
+          when :curator
+            if player.action_take.has_key?(:giftnone)
+              User(player.user).send "You do not give out an artifact."
+            elsif player.action_take.has_key?(:giftplayer)
+              target_player = player.action_take[:giftplayer]
+              player.action_take[:giftplayerartifact] = artifacts.shift
+              User(player.user).send "You give #{target_player} an artifact."
+              target_player.artifact = ARTIFACTS[player.action_take[:giftplayerartifact]]
+            end
           end
         end
 
-        unless @game.werewolves.nil?
-          @game.werewolves.each do |p|
-            other_wolf = @game.werewolves.reject{ |w| w == p }
+        unless @game.waking_wolves.nil?
+          @game.waking_wolves.each do |p|
+            other_wolf = @game.wolves.reject{ |w| w == p }
             reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
             User(p.user).send reveal_msg
             if (other_wolf.empty? && @game.with_variant?(:lonewolf))
@@ -802,8 +931,8 @@ module Cinch
 
         player = @game.find_player_by_role(:minion)
         unless player.nil?
-          werewolves = @game.werewolves
-          reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for other werewolves and see: #{werewolves.join(", ")}."
+          werewolves = @game.wolves
+          reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for werewolves and see: #{werewolves.join(", ")}."
           User(player.user).send reveal_msg
         end
 
@@ -828,6 +957,12 @@ module Cinch
               User(player.user).send "Middle is #{player.action_take[:seertable]}."
             end
           end
+        end
+
+        player = @game.find_player_by_role(:apprentice_seer)
+        unless player.nil?
+          player.action_take = {:apprentice_seer => @game.table_cards.shuffle.first }
+          User(player.user).send "One of the middle cards is: #{player.action_take[:apprentice_seer].upcase}."
         end
 
         if @game.ultimate?
@@ -872,6 +1007,35 @@ module Cinch
             User(p.user).send reveal_msg
           end
         end
+
+        player = @game.find_player_by_role(:curator)
+        unless player.nil?
+          if player.action_take.has_key?(:giftnone)
+            User(player.user).send "You do not give out an artifact."
+          elsif player.action_take.has_key?(:giftplayer)
+            target_player = player.action_take[:giftplayer]
+            player.action_take[:giftplayerartifact] = artifacts.shift
+            User(player.user).send "You give #{target_player} an artifact."
+            target_player.artifact = ARTIFACTS[player.action_take[:giftplayerartifact]]
+          end
+        end
+      end
+
+      def inform_artifacts
+        players = []
+        for player in @game.curator
+          if player.action_take.has_key?(:giftplayer)
+            target_player = player.action_take[:giftplayer]
+            artifact = player.action_take[:giftplayerartifact]
+            message = "You have been given the #{artifact}."
+            message << " You are now a #{ARTIFACTS[artifact]}." if ARTIFACTS[artifact]
+            User(target_player.user).send message
+            players.push target_player
+          end
+        end
+        unless players.empty?
+          Channel(@channel_name).send "The following players have artifacts in front of them: #{players.join(", ")}"
+        end
       end
 
       def do_end_game
@@ -896,6 +1060,8 @@ module Cinch
               Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
             elsif player.action_take.has_key?(:seertable)
               Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
+            elsif player.action_take.has_key?(:apprentice_seer)
+              Channel(@channel_name).send "DOPPELGANGER-APPRENTICE_SEER looked at the table and saw #{player.action_take[:apprentice_seer]}"
             elsif player.action_take.has_key?(:thiefnone)
               Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
             elsif player.action_take.has_key?(:thiefplayer)
@@ -910,9 +1076,9 @@ module Cinch
           end
         end
 
-        if (@game.with_variant?(:lonewolf) && @game.werewolves.count == 1)
-          player = @game.find_player_by_role(:werewolf)
-          Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle"
+        if (@game.with_variant?(:lonewolf) && @game.wolves.count == 1)
+          player = @game.wolves[0]
+          Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle" unless player.dream_wolf?
         end
 
         player = @game.find_player_by_role(:seer)
@@ -922,6 +1088,11 @@ module Cinch
           elsif player.action_take.has_key?(:seertable)
             Channel(@channel_name).send "SEER looked at the table and saw: #{player.action_take[:seertable]}"
           end
+        end
+
+        player = @game.find_player_by_role(:apprentice_seer)
+        unless player.nil?
+          Channel(@channel_name).send "APPRENTICE_SEER looked at the table and saw #{player.action_take[:apprentice_seer].upcase}"
         end
 
         player = @game.find_player_by_role(:thief)
@@ -958,15 +1129,30 @@ module Cinch
           Channel(@channel_name).send "DRUNK drew #{player.action_take[:drunk].upcase} from the table"
         end
 
+        player = @game.find_player_by_role(:curator)
+        unless player.nil?
+          if (player.action_take.has_key?(:giftnone))
+            Channel(@channel_name).send "CURATOR gave no artifacts"
+          elsif (player.action_take.has_key?(:giftplayer))
+            Channel(@channel_name).send "CURATOR gave #{player.action_take[:giftplayer]} the #{player.action_take[:giftplayerartifact]}"
+          end
+        end
+
+        player = @game.old_doppelganger
+        unless player.nil? || player.action_take.nil?
+          if (player.action_take.has_key?(:giftnone))
+            Channel(@channel_name).send "DOPPELGANGER-CURATOR gave no artifacts"
+          elsif (player.action_take.has_key?(:giftplayer))
+            Channel(@channel_name).send "DOPPELGANGER-CURATOR gave #{player.action_take[:giftplayer]} the #{player.action_take[:giftplayerartifact]}"
+          end
+        end
 
         # show ending role result
         roles_msg = @game.players.map{ |player|
-          if (player.role != player.cur_role || player.old_doppelganger?)
-            if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)
-              Format(:bold, "#{player} - #{player.cur_role.upcase}-#{@game.doppelganger_role.upcase}")
-            else
-              Format(:bold, "#{player} - #{player.cur_role.upcase}")
-            end
+          if (player.role != player.cur_role || player.old_doppelganger? || player.artifact)
+		    Format(:bold, "#{player} - #{player.cur_role.upcase}#{
+              "-#{@game.doppelganger_role.upcase}" if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)}#{
+              " (#{player.artifact.upcase})" if (player.artifact)}")
           else
             "#{player} - #{player.cur_role.upcase}"
           end
@@ -987,52 +1173,73 @@ module Cinch
           player.role = player.cur_role
         end
 
+        # replace players with artifacts with new roles
+        @game.players.map do |player|
+          player.role = player.artifact if player.artifact
+        end
+
         lynch_totals = @game.lynch_totals
 
         # sort from max to min
         lynch_totals = lynch_totals.sort_by{ |vote, voters| voters.size }.reverse
 
         lynch_msg = lynch_totals.map do |voted, voters|
-          "#{voters.count} - #{voted} (#{voters.join(', ')})"
+          "#{voters.count} - #{voted}#{voted.prince? ? '*' : ''} (#{voters.map{|voter| "#{voter}#{voter.bodyguard? ? '*' : ''}"}.join(', ')})"
         end.join(', ')
         Channel(@channel_name).send "Final Votes: #{lynch_msg}"
 
-        #grab the first person lynched and see if anyone else matches them
-        first_lynch = lynch_totals.first
-        lynching = lynch_totals.select { |voted, voters| voters.count == first_lynch[1].count }
+        Channel(@channel_name).send "BODYGUARD#{@game.bodyguard.size > 1 ? "S protect" : " protects"} #{@game.bodyguard.map{|p| @game.lynch_votes[p]}.uniq.join(", ")}" unless @game.bodyguard.empty?
+
+        # find all cursed who became wolves and then make them wolves, in case a cursed votes for another cursed
+        curselist = []
+        lynch_totals.map do |voted, voters|
+          if voted.cursed? && voters.detect{|p| p.wolf?}
+            curselist.push voted
+          end
+        end
+
+        for player in curselist
+          Channel(@channel_name).send "CURSED #{player} becomes a wolf!"
+          player.role = :werewolf
+        end
+
+        # Remove players who are either a prince or were voted for by a bodyguard
+        can_lynch = lynch_totals.reject { |voted, voters| @game.protected.include?(voted) }
+
+        # grab the first person lynched and see if anyone else matches them
+        first_lynch = can_lynch.first
+        lynching = can_lynch.select { |voted, voters| voters.count == first_lynch[1].count }
         lynching = lynching.map{ |voted, voters| voted}
 
-        # Check for hunter and add their target
-        if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
-          hunter_target = lynching.map { |lynched|
-            @game.lynch_votes[lynched] if lynched.hunter?
-          }
-          hunter_target.reject! { |r| r.nil? }
-          (lynching+=hunter_target).uniq!
-        end
+        # Check for hunter(s) and add their target(s)
+		# Do multiple times in case hunters point at other hunters
+		hunter_target = []
+		@game.hunter.size.times do
+          if (lynching.detect{ |l| l.hunter? && !@game.protected.include?(l)} && first_lynch && first_lynch[1].count > 1)
+            hunter_target = lynching.map { |lynched|
+              @game.lynch_votes[lynched] if lynched.hunter?
+            }
+            hunter_target.reject! { |r| r.nil? }
+            (lynching += hunter_target).uniq!
+          end
+		end
 
-        # Do it again in case the target of a hunter is another hunter
-        # Yay edge cases!
-        if (lynching.detect{ |l| l.hunter? } && first_lynch[1].count > 1)
-          hunter_target = lynching.map { |lynched|
-            @game.lynch_votes[lynched] if lynched.hunter?
-          }
-          hunter_target.reject! { |r| r.nil? }
-          Channel(@channel_name).send "HUNTER chooses: #{hunter_target.join(', ')}."
-          (lynching+=hunter_target).uniq!
-        end
+        Channel(@channel_name).send "HUNTER chooses: #{hunter_target.empty? ? "No one" : hunter_target.map{|p| "#{p}#{"*" if @game.protected.include?(p)}"}.join(', ')}." if (lynching.detect{ |l| l.hunter? && !@game.protected.include?(l)} && first_lynch && first_lynch[1].count > 1)
+        lynching.reject! { |p| @game.protected.include?(p) }
 
-        lynched_players = first_lynch[1].count == 1 ? "No one is lynched!" : "#{lynching.join(', ')}!"
+        lynched_players = (!first_lynch || first_lynch[1].count == 1) ? "No one is lynched!" : "#{lynching.join(', ')}!"
         Channel(@channel_name).send "Lynched players: #{lynched_players}"
 
         # return victory result
         # we lynched someone
-        if first_lynch[1].count > 1
+        if first_lynch && first_lynch[1].count > 1
           # werewolf lynched villagers win
-          if lynching.detect { |l| l.werewolf? }
+          if lynching.detect { |l| l.wolf? }
             if lynching.detect { |l| l.tanner? }
               dead_tanner = lynching.select{ |l| l.tanner? }
               Channel(@channel_name).send "Villager team and Tanner WIN! Villager Team: #{@game.humans.join(', ')}. Tanner: #{dead_tanner.join(', ')}."
+            elsif @game.humans.empty?
+              Channel(@channel_name).send "No one wins..."
             else
               Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
             end
@@ -1041,7 +1248,7 @@ module Cinch
             if lynching.detect { |l| l.tanner? }
               dead_tanner = lynching.select{ |l| l.tanner? }
               Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
-            elsif @game.werewolves.empty?
+            elsif @game.wolves.empty?
               if lynching.detect { |l| l.good? }
                 minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
@@ -1050,16 +1257,16 @@ module Cinch
               end
             else
               minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
-              Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
+              Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.wolves.join(', ')}.#{minion_msg}"
             end
           end
         # no one is lynched
         else
-          if @game.werewolves.empty?
+          if @game.wolves.empty?
             Channel(@channel_name).send "Villager team WINS! Team: #{@game.humans.join(', ')}."
           else
             minion_msg = @game.minion.empty? ? "" : " Minion: #{@game.minion.join(', ')}."
-            Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.werewolves.join(', ')}.#{minion_msg}"
+            Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.wolves.join(', ')}.#{minion_msg}"
           end
         end
 
@@ -1071,7 +1278,7 @@ module Cinch
         @game.players.each do |p|
           Channel(@channel_name).devoice(p.user)
         end
-        @game = Game.new
+        @game = Game.new(@game.roles)
         @idle_timer.start
         @game_timer_minutes = nil
       end
@@ -1287,29 +1494,15 @@ module Cinch
               options = roles.downcase.split(" ")
             end
 
-            valid_role_options        = ["villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger", "doppleganger", "masons"]
-            valid_variant_options     = ["lonewolf", "random", "blindrandom"]
-            valid_random_role_options = ["villager", "villager", "villager", "werewolf", "seer", "robber", "troublemaker", "tanner", "drunk", "hunter", "mason", "insomniac", "minion", "doppelganger"]
-
-
-            role_options    = options.select{ |opt| valid_role_options.include?(opt) }
-            variant_options = options.select{ |opt| valid_variant_options.include?(opt) }
-
-            if role_options.include?("masons")
-              role_options -= ["masons"]
-              role_options += ["mason"]
-            end
-
-            if role_options.include?("doppleganger")
-              role_options -= ["doppleganger"]
-              role_options += ["doppelganger"]
-            end
+            role_options    = options.collect{ |opt| @game.parse_role(opt) }.reject{ |opt| opt.nil? }
+            variant_options = options.select{ |opt| VALID_VARIANTS.include?(opt) }
+            rejected        = options.reject{ |opt| @game.parse_role(opt) || VALID_VARIANTS.include?(opt) }
 
             if action == 'remove'
-              if role_options.include?("mason")
-                role_options += ["mason"]
+              if role_options.include?(:mason)
+                role_options += [:mason]
               end
-              role_options = @game.roles.map(&:to_s).subtract_once(role_options)
+              role_options = @game.roles.subtract_once(role_options)
             end
 
             if variant_options.include?("random") && variant_options.include?("blindrandom")
@@ -1317,45 +1510,51 @@ module Cinch
               game_options = nil
               Channel(@channel_name).send "You cannot specify both random and blindrandom."
             elsif (variant_options.include?("random") || variant_options.include?("blindrandom"))
+              valid_random_role_options = RANDOM_ROLES
               if !role_options.empty?
                 game_options = nil
                 role_options = nil
                 Channel(@channel_name).send "You cannot specify roles when using random or blindrandom"
               elsif variant_options.include?("random")
-                roles = valid_random_role_options.sample(@game.player_count+2)
-                if (roles.include?("mason") && roles.count("mason") == 1)
-                  roles = roles.reject{|r| r == "mason"}.sample(@game.player_count)
-                  roles += ["mason"]
+                roles = valid_random_role_options.sample(@game.player_count + 2)
+                if (roles.include?(:mason) && roles.count(:mason) == 1)
+                  roles = roles.reject{|r| r == :mason}.sample(@game.player_count)
+                  roles += [:mason]
                 end
-                roles += ["werewolf"]
+                roles += [:werewolf]
                 role_options = roles
               elsif variant_options.include?("blindrandom")
-                valid_random_role_options += ["werewolf", "mason"]
-                roles = valid_random_role_options.sample(@game.player_count+3)
+                valid_random_role_options += [:werewolf, :mason]
+                roles = valid_random_role_options.sample(@game.player_count + 3)
                 role_options = roles 
               end
             end
-            unknown_options = options.select{ |opt| !valid_role_options.include?(opt) && !valid_variant_options.include?(opt)}
-          
 
             roles = role_options
             unless variant_options.include?("blindrandom")
-              valid_role_options.map{ |vr|
-                if (vr == "werewolf" && !roles.include?("werewolf"))
+              ROLE_COUNTS.each do |vr, range|
+                count = roles.count(vr)
+                if count > range.max && range.max == 0
                   role_options = nil
-                  Channel(@channel_name).send "You must include at least one werewolf."
-                elsif (vr !="werewolf" && vr != "villager" && vr != "mason" && roles.count(vr) > 1) || (vr == "werewolf" && (roles.count(vr) > 2)) || (vr == "villager" && roles.count(vr) > 3) || (vr == "mason" && roles.count("mason") > 2)
+                  Channel(@channel_name).send "#{vr} is not yet implemented."
+                elsif count > range.max
                   role_options = nil
                   Channel(@channel_name).send "You have included #{vr} too many times."
+                elsif count == 0 && range.min > 0
+                  role_options = nil
+                  Channel(@channel_name).send "You must include at least one #{vr}."
+                elsif !range.include?(count)
+                  role_options = nil
+                  Channel(@channel_name).send "You have chosen an invalid number of #{vr}."
                 end
-              }
+              end
             end
-            if unknown_options.count > 0
-              Channel(@channel_name).send "Unknown roles specified: #{unknown_options.join(", ")}."
+            if rejected.count > 0
+              Channel(@channel_name).send "Unknown roles specified: #{rejected.join(", ")}."
             end
 
             unless role_options.nil?
-              roles += ["mason"] if (roles.include?("mason") && roles.count("mason") == 1 && !variant_options.include?("blindrandom"))
+              roles += [:mason] if (roles.include?(:mason) && roles.count(:mason) == 1 && !variant_options.include?("blindrandom"))
               @game.change_type :ultimate, :roles => roles, :variants => variant_options
               roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}" 
               game_type_message = "Using #{self.game_settings[:roles].count} #{roles_msg}."

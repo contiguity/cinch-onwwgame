@@ -1,3 +1,16 @@
+- date: "2014-10-26"
+  changes:
+    - "Centralized constants for types of roles"
+    - "Added framework for all Daybreak roles"
+    - "Implemented curator"
+    - "Bug fixes"
+- date: "2014-10-25"
+  changes:
+    - "Added prince and bodyguard"
+    - "Added apprentice seer"
+    - "Added line on '!roleset' to !help"
+    - "Added dream wolf and cursed"
+    - "Maintain roleset between games"
 - date: "2014-10-24"
   changes:
     - "Renamed 'onuww' to 'ultimate'"

@@ -1,4 +1,5 @@
 require 'json'
+require_relative 'constants'
 
 #================================================================================
 # GAME
@@ -7,25 +8,14 @@ require 'json'
 $player_count = 0
 
 class Game
-  MIN_PLAYERS = 3
-  MAX_PLAYERS = 6
-  ONUWW_MAX_PLAYERS = 10
-
-  BASE_ROLES = [
-      :werewolf, :werewolf, :seer, :thief, :villager
-    ]
-  DEFAULT_ULTIMATE_ROLES = [
-      :werewolf, :werewolf, :seer, :robber, :troublemaker, :villager
-    ]
-
 
   attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent
 
-  def initialize
+  def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
     self.players         = []
     self.type            = :ultimate
-    self.roles           = DEFAULT_ULTIMATE_ROLES
+    self.roles           = init_roles
     self.variants        = []
     self.invitation_sent = false
     self.player_cards    = []
@@ -106,7 +96,7 @@ class Game
   def change_type(type, options = {})
     self.type = type
     if type == :ultimate
-      self.roles    = options[:roles].map(&:to_sym)
+      self.roles = options[:roles]
       unless options[:variants].nil?
         self.variants = options[:variants].map(&:to_sym)
       end
@@ -169,6 +159,7 @@ class Game
       extra_players = self.player_count - MIN_PLAYERS
       gameroles = BASE_ROLES + [:villager]*extra_players
     end
+    alpha_wolf = gameroles.include?(:alpha_wolf)
     gameroles.shuffle!
     self.players.each do |player|
       role = gameroles.shift
@@ -176,6 +167,9 @@ class Game
       player.receive_role( role )
     end
     self.table_cards = gameroles
+    if (alpha_wolf)
+      # TODO: add extra wolf for alpha wolf
+    end
   end
 
   # Claims
@@ -293,6 +287,14 @@ class Game
     self.players.select{ |p| p.werewolf? || p.dg_role?(:werewolf) }
   end
 
+  def wolves
+    self.players.select{ |p| p.wolf? || WOLF_ROLES.any?{ |role| p.dg_role?(role) } }
+  end
+
+  def waking_wolves
+    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) }
+  end
+
   def humans
     self.players.select{ |p| p.good? }
   end
@@ -313,12 +315,40 @@ class Game
     self.players.select{ |p| p.hunter? }
   end
 
+  def prince
+    self.players.select{ |p| p.prince? }
+  end
+
+  def bodyguard
+    self.players.select{ |p| p.bodyguard? }
+  end
+
+  def cursed
+    self.players.select{ |p| p.cursed? }
+  end
+
+  def apprentice_seer
+    self.players.select{ |p| p.apprentice_seer? }
+  end
+
+  def curator
+    self.players.select{ |p| p.curator? || p.dg_role?(:curator) }
+  end
+
+  def protected
+      self.players.select{ |p| p.prince? || bodyguard.map{|bg| self.lynch_votes[bg]}.include?(p) }
+  end
+
   def non_special
-    self.players.select{ |p| p.villager? || p.werewolf? || p.tanner? || p.drunk? || p.hunter? || p.mason? || p.insomniac? || p.minion? }
+    self.players.select{ |p| p.non_special? }
   end
 
   def old_doppelganger
     self.players.find{ |p| p.old_doppelganger? }
+  end
+
+  def doppelganger_curator
+    self.players.select{ |p| p.dg_role?(:curator) }
   end
 
   def doppelganger_role
@@ -327,28 +357,56 @@ class Game
 
   def parse_role(role_string)
     case role_string
-    when "dg", "doppelganger"
+    when "ars", "auraseer", "aura_seer"
+      role = :aura_seer
+    when "aps", "apprenticeseer", "apprentice_seer"
+      role = :apprentice_seer
+    when "aw", "alphawolf", "alpha_wolf"
+      role = :alpha_wolf
+    when "bg", "bodyguard"
+      role = :bodyguard
+    when "ctr", "curator"
+      role = :curator
+    when "csd", "cursed"
+      role = :cursed
+    when "dg", "doppelganger", "doppleganger"
       role = :doppelganger
+    when "dw", "dreamwolf", "dream_wolf"
+      role = :dream_wolf
     when "dk", "drunk"
       role = :drunk
     when "h", "hunter"
       role = :hunter
     when "i", "insomniac"
       role = :insomniac
-    when "msn", "mason"
+    when "msn", "mason", "masons"
       role = :mason
     when "mnn", "minion"
       role = :minion
+    when "mw", "mysticwolf", "mystic_wolf"
+      role = :mystic_wolf
+    when "pi", "paranormal_investigator"
+      role = :paranormal_investigator
+    when "pr", "prince"
+      role = :prince
     when "rbr", "robber"
       role = :robber
+    when "rvl", "revealer"
+      role = :revealer
     when "sr", "seer"
       role = :seer
+    when "stl", "sentinel"
+      role = :sentinel
     when "tm", "troublemaker"
       role = :troublemaker
     when "tnr", "tanner"
       role = :tanner
+    when "vi", "villageidiot", "village_idiot"
+      role = :village_idiot
     when "v", "vgr", "villager"
       role = :villager
+    when "wtc", "witch"
+      role = :witch
     when "ww", "werewolf"
       role = :werewolf
     end
@@ -362,15 +420,16 @@ end
 
 class Player
 
-  attr_accessor :user, :role, :cur_role, :action_take, :doppelganger_look, :confirm
+  attr_accessor :user, :role, :cur_role, :action_take, :doppelganger_look, :confirm, :artifact
 
   def initialize(user)
     self.user = user
     self.role = nil
     self.cur_role = nil
-    self.action_take = nil
+    self.action_take = {}
     self.doppelganger_look = nil
     self.confirm = false
+    self.artifact = nil
   end
 
   def receive_role(role)
@@ -386,72 +445,132 @@ class Player
     self.user.nick
   end
 
-  def villager?
-    self.role == :villager
+  def alpha_wolf?
+    self.role == :alpha_wolf
   end
 
-  def werewolf?
-    self.role == :werewolf
+  def apprentice_seer?
+    self.role == :apprentice_seer
   end
 
-  def seer?
-    self.role == :seer
+  def aura_seer?
+    self.role == :aura_seer
   end
 
-  def thief?
-    self.role == :thief
+  def bodyguard?
+    self.role == :bodyguard
   end
 
-  def robber?
-    self.role == :robber
+  def curator?
+    self.role == :curator
   end
 
-  def troublemaker?
-    self.role == :troublemaker
+  def cursed?
+    self.role == :cursed
   end
 
-  def tanner?
-    self.role == :tanner
+  def dream_wolf?
+    self.role == :dream_wolf
   end
 
   def drunk?
     self.role == :drunk
   end
 
-  def hunter?
-    self.role == :hunter
+  def doppelganger?
+    self.role == :doppelganger
   end
 
-  def mason?
-    self.role == :mason
+  def hunter?
+    self.role == :hunter
   end
 
   def insomniac?
     self.role == :insomniac
   end
 
+  def mason?
+    self.role == :mason
+  end
+
   def minion?
     self.role == :minion
   end
 
-  def doppelganger?
-    self.role == :doppelganger
+  def mystic_wolf?
+    self.role == :mystic_wolf
+  end
+
+  def paranormal_investigator?
+    self.role == :paranormal_investigator
+  end
+
+  def prince?
+    self.role == :prince
+  end
+
+  def revealer?
+    self.role == :revealer
+  end
+
+  def robber?
+    self.role == :robber
+  end
+
+  def seer?
+    self.role == :seer
+  end
+
+  def sentinel?
+    self.role == :sentinel
+  end
+
+  def tanner?
+    self.role == :tanner
+  end
+
+  def thief?
+    self.role == :thief
+  end
+
+  def troublemaker?
+    self.role == :troublemaker
+  end
+
+  def villager?
+    self.role == :villager
+  end
+
+  def village_idiot?
+    self.role == :village_idiot
+  end
+
+  def werewolf?
+    self.role == :werewolf
+  end
+
+  def witch?
+    self.role == :werewolf
+  end
+
+  def wolf?
+    WOLF_ROLES.any?{ |role| role == self.role }
   end
 
   def good?
-    [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :mason, :insomniac, :doppelganger].any?{ |role| role == self.role}
+    GOOD_ROLES.any?{ |role| role == self.role }
   end
 
   def evil?
-    [:werewolf, :minion].any?{ |role| role == self.role}
+    EVIL_ROLES.any?{ |role| role == self.role }
   end
 
   def non_special?
-    self.werewolf? || self.villager? || self.tanner? || self.drunk? || self.hunter? || self.mason? || self.insomniac? || self.minion?
+    NON_SPECIALS.any?{ |role| role == self.role }
   end
 
   def dg_non_special?
-    self.dg_role?(:werewolf) || self.dg_role?(:villager) || self.dg_role?(:tanner) || self.dg_role?(:drunk) || self.dg_role?(:hunter) || self.dg_role?(:mason) || self.dg_role?(:insomniac) || self.dg_role?(:minion)
+    NON_SPECIALS.any?{ |role| self.dg_role?(role) }
   end
 
   def confirmed?
@@ -463,11 +582,11 @@ class Player
   end
 
   def dg_role?(role)
-    if self.doppelganger?
+#    if self.doppelganger?
       unless self.doppelganger_look.nil?
         self.doppelganger_look[:dgrole] == role
       end
-    end
+#    end
   end
 
   def old_doppelganger?
