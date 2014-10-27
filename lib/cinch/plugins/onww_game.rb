@@ -1150,7 +1150,7 @@ module Cinch
         # show ending role result
         roles_msg = @game.players.map{ |player|
           if (player.role != player.cur_role || player.old_doppelganger? || player.artifact)
-		    Format(:bold, "#{player} - #{player.cur_role.upcase}#{
+        Format(:bold, "#{player} - #{player.cur_role.upcase}#{
               "-#{@game.doppelganger_role.upcase}" if (!@game.old_doppelganger.nil? && player.cur_role == :doppelganger)}#{
               " (#{player.artifact.upcase})" if (player.artifact)}")
           else
@@ -1212,17 +1212,17 @@ module Cinch
         lynching = lynching.map{ |voted, voters| voted}
 
         # Check for hunter(s) and add their target(s)
-		# Do multiple times in case hunters point at other hunters
-		hunter_target = []
-		@game.hunter.size.times do
-          if (lynching.detect{ |l| l.hunter? && !@game.protected.include?(l)} && first_lynch && first_lynch[1].count > 1)
-            hunter_target = lynching.map { |lynched|
-              @game.lynch_votes[lynched] if lynched.hunter?
-            }
-            hunter_target.reject! { |r| r.nil? }
-            (lynching += hunter_target).uniq!
-          end
-		end
+        # Do multiple times in case hunters point at other hunters
+        hunter_target = []
+        @game.hunter.size.times do
+              if (lynching.detect{ |l| l.hunter? && !@game.protected.include?(l)} && first_lynch && first_lynch[1].count > 1)
+                hunter_target = lynching.map { |lynched|
+                  @game.lynch_votes[lynched] if lynched.hunter?
+                }
+                hunter_target.reject! { |r| r.nil? }
+                (lynching += hunter_target).uniq!
+              end
+        end
 
         Channel(@channel_name).send "HUNTER chooses: #{hunter_target.empty? ? "No one" : hunter_target.map{|p| "#{p}#{"*" if @game.protected.include?(p)}"}.join(', ')}." if (lynching.detect{ |l| l.hunter? && !@game.protected.include?(l)} && first_lynch && first_lynch[1].count > 1)
         lynching.reject! { |p| @game.protected.include?(p) }
@@ -1270,6 +1270,7 @@ module Cinch
           end
         end
 
+        @game_timer.stop
         self.start_new_game
       end
 
@@ -1280,6 +1281,7 @@ module Cinch
         end
         @game = Game.new(@game.roles)
         @idle_timer.start
+        @game_timer = nil
         @game_timer_minutes = nil
       end
 
