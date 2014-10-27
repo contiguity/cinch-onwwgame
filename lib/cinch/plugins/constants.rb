@@ -16,8 +16,6 @@ VALID_VARIANTS = ["lonewolf", "random", "blindrandom"]
 
 ARTIFACTS = {:claw => :werewolf, :brand => :villager, :void => nil, :void => nil, :cudgel => :tanner, :mask => nil, :bow => :hunter, :sword => :bodyguard, :cloak => :prince}
 
-# only impose maximums on roles that would cause timing issues
-# if someone wants a game with 9 tanners, might as well let them
 # also set maximums to 0 for roles not yet implemented
 ROLE_COUNTS = {
 	:alpha_wolf => [0], # NYI
