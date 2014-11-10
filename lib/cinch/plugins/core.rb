@@ -291,8 +291,8 @@ class Game
     self.players.select{ |p| p.wolf? || WOLF_ROLES.any?{ |role| p.dg_role?(role) } }
   end
 
-  def waking_wolves
-    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) }
+  def waking_wolves #mystic wolf is given wolf info during night action (so can view a non-wolf if desired)
+    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) || p.mystic_wolf? || p.dg_role?(:mystic_wolf) }
   end
 
   def humans
@@ -325,6 +325,10 @@ class Game
 
   def cursed
     self.players.select{ |p| p.cursed? }
+  end
+  
+  def mystic_wolf
+    self.players.select{ |p| p.mystic_wolf? }
   end
 
   def apprentice_seer

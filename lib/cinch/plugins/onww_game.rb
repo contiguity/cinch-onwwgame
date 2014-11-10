@@ -52,6 +52,9 @@ module Cinch
       match /unclaim/i,           :method => :unclaim_role
       match /claims/i,            :method => :list_claims
 
+      # mystic_wolf
+      match /mysticview (.+)/i,   :method => :mystic_wolf_view_player#mysticview to avoid conflict with seer
+
       # seer
       match /view (.+)/i,         :method => :seer_view_player
       match /tableview/i,         :method => :seer_view_table
@@ -175,6 +178,9 @@ module Cinch
             User(m.user).send "!claim (role) - claim a role"
             User(m.user).send "!unclaim - revoke your existing role claim, if any"
             User(m.user).send "!claims - show the list of current role claims"
+            User(m.user).send "!timer set (time) - Sets timer in minutes"
+            User(m.user).send "!timer - Views time left"
+            
           # end
         end
       end
@@ -350,6 +356,7 @@ module Cinch
                       roles += ["villager"]
                       @game.change_type :onuww, :roles => roles
                     }
+                    Channel(@channel_name).send "Not enough roles specified; added Villagers for empty slots"
                     self.do_start_game
                   else
                     Channel(@channel_name).send "Not enough roles specified for number of players."
@@ -540,10 +547,34 @@ module Cinch
         end
       end
 
-      def status(m)
-        m.reply @game.check_game_state
-      end
+      #def status(m) #this is already defined
+      #  m.reply @game.check_game_state
+      #end
 
+      def mystic_wolf_view_player(m, view)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          
+          if (player.mystic_wolf? || (player.doppelganger? && player.cur_role == :mystic_wolf))
+            target_player = @game.find_player(view)
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            elsif target_player.nil?
+              User(m.user).send "\"#{view}\" is an invalid target."
+            elsif target_player == player
+              User(m.user).send "You cannot view yourself."
+            else
+              player.action_take = {:mysticwolfplayer => target_player}              
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_for_day_phase
+            end
+          else
+            User(m.user).send "You are not the MYSTIC WOLF."
+          end
+        end
+      end
+      
       def seer_view_player(m, view)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
@@ -812,11 +843,13 @@ module Cinch
         when *NON_SPECIALS
           loyalty_msg = "You are a #{player.cur_role.upcase}. Type !confirm to confirm your role."
         when :seer
-          loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""
+          loyalty_msg = "You are the SEER. What do you want to view? \"!view [player]\" \"!tableview\""#technically, this is optional
         when :mystic_wolf
-          loyalty_msg = "You are the MYSTIC_WOLF. Who do you want to view? \"!view [player]\""
-        when :alpha_wolf
-          loyalty_msg = "You are the ALPHA_WOLF. Do you want to turn someone into a wolf? \"!wolfify [player]\" or \"!nowolfify\""
+          other_wolf = @game.wolves.reject{ |w| w == player }
+          reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
+          loyalty_msg = "You are the MYSTIC_WOLF. #{reveal_msg} Who do you want to view? \"!mysticview [player]\""#technically, this is optional
+        when :alpha_wolf#alpha wolf is not optional -- the rules state "The Alpha Wolf /must/ exchange the center werewolf card..."
+          loyalty_msg = "You are the ALPHA_WOLF. Who do you want to turn into a wolf? \"!wolfify [player]\"" #removed  or \"!nowolfify\
         when :thief
           loyalty_msg = "You are the THIEF. Do you want to take a role? \"!thief [player]\", \"!tablethief\" or \"!nothief\""
         when :robber
@@ -866,9 +899,12 @@ module Cinch
       def night_reveal
         artifacts = ARTIFACTS.keys.shuffle
         unless @game.old_doppelganger.nil?
+        ###Doppelganger actions
           player = @game.old_doppelganger
           player.cur_role = player.role
           case @game.doppelganger_role
+          when :mystic_wolf
+            User(player.user).send "#{player.action_take[:mysticwolfplayer]} is #{player.action_take[:mysticwolfplayer].cur_role.upcase}"
           when :minion
             werewolves = @game.wolves
             reveal_msg = werewolves.empty? ? "You do not see any werewolves." : "You look for werewolves and see: #{werewolves.join(", ")}."
@@ -917,6 +953,7 @@ module Cinch
           end
         end
 
+        ###Wolf reveal, minion reveal...
         unless @game.waking_wolves.nil?
           @game.waking_wolves.each do |p|
             other_wolf = @game.wolves.reject{ |w| w == p }
@@ -929,6 +966,13 @@ module Cinch
           end
         end
 
+        player = @game.find_player_by_role(:mystic_wolf)
+        unless player.nil?
+          target_player = player.action_take[:mysticwolfplayer]
+          player.action_take[:mysticwolfplayerrole] = target_player.cur_role
+          User(player.user).send "#{player.action_take[:mysticwolfplayer]} is #{player.action_take[:mysticwolfplayer].cur_role.upcase}."
+        end
+        
         player = @game.find_player_by_role(:minion)
         unless player.nil?
           werewolves = @game.wolves
@@ -1056,7 +1100,9 @@ module Cinch
         unless player.nil?
           Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look[:dglook]} and became #{player.doppelganger_look[:dgrole].upcase}"
           unless player.action_take.nil?
-            if player.action_take.has_key?(:seerplayer)
+            if player.action_take.has_key?(:mysticwolfplayer)
+              Channel(@channel_name).send "DOPPLEGANGER-MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
+            elsif player.action_take.has_key?(:seerplayer)
               Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
             elsif player.action_take.has_key?(:seertable)
               Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
@@ -1079,6 +1125,11 @@ module Cinch
         if (@game.with_variant?(:lonewolf) && @game.wolves.count == 1)
           player = @game.wolves[0]
           Channel(@channel_name).send "LONE WOLF saw #{player.action_take[:lonewolf].upcase} in the middle" unless player.dream_wolf?
+        end
+        
+        player = @game.find_player_by_role(:mystic_wolf)
+        unless player.nil?
+          Channel(@channel_name).send "MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
         end
 
         player = @game.find_player_by_role(:seer)
@@ -1249,10 +1300,10 @@ module Cinch
               dead_tanner = lynching.select{ |l| l.tanner? }
               Channel(@channel_name).send "TANNER WINS! Tanner: #{dead_tanner.join(', ')}."
             elsif @game.wolves.empty?
-              if lynching.detect { |l| l.good? }
-                minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : " Minion: #{@game.minion.join(', ')}."
+              if lynching.detect { |l| l.good? }#a human was lynched
+                minion_msg = @game.minion.empty? ? " Everyone loses...womp wahhhhhh." : "Minion: #{@game.minion.join(', ')}."
                 Channel(@channel_name).send "Werewolves WIN!#{minion_msg}"
-              else
+              else#someone was lynched, but none are a werewolf, tanner, or human
                 Channel(@channel_name).send "Werewolves WIN! Everyone loses...womp wahhhhhh."
               end
             else
@@ -1269,12 +1320,19 @@ module Cinch
             Channel(@channel_name).send "Werewolf team WINS! Team: #{@game.wolves.join(', ')}.#{minion_msg}"
           end
         end
-
-        @game_timer.stop
+        #Channel(@channel_name).send "---(Stopping game timer)"
+        unless @game_timer_minutes.nil?
+          @game_timer.stop
+        end
+        #Channel(@channel_name).send "---(Game timer no longer running)"
         self.start_new_game
       end
 
       def start_new_game
+        #with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
+        #roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
+        #Channel(@channel_name).send "---Type !start (after players join) to play another game using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}" 
+
         Channel(@channel_name).moderated = false
         @game.players.each do |p|
           Channel(@channel_name).devoice(p.user)
@@ -1613,7 +1671,7 @@ module Cinch
 
         changelog
       end
-    end
+    end#end class
   end
 end
 

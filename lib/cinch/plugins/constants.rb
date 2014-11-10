@@ -30,7 +30,7 @@ ROLE_COUNTS = {
 	:hunter => [*0..1],
 	:mason => [0, *2],
 	:minion => [*0..1],
-	:mystic_wolf => [0], # NYI
+	:mystic_wolf => [0,1],#newly implemented
 	:paranormal_investigator => [0], # NYI
 	:prince => [*0..1],
 	:revealer => [0], # NYI
@@ -41,6 +41,6 @@ ROLE_COUNTS = {
 	:thief => [0, 1],
 	:troublemaker => [0, 1],
 	:village_idiot => [0], # NYI
-	:werewolf => [*0..2],
+	:werewolf => [*0..3], #Includes a fun new pose
 	:witch => [0] # NYI
 }
