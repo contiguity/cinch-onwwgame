@@ -9,7 +9,7 @@ $player_count = 0
 
 class Game
 
-  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent, :pi_role, :dg_pi_role
 
   def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
@@ -24,6 +24,8 @@ class Game
     self.subphase        = 1
     self.lynch_votes     = {}
     self.claims          = {}
+    self.dg_pi_role      = nil
+    self.pi_role      = nil    
   end
 
   #----------------------------------------------
@@ -358,7 +360,7 @@ class Game
   def doppelganger_role
     self.players.find{ |p| p.old_doppelganger? }.doppelganger_look[:dgrole]
   end
-
+  
   def parse_role(role_string)
     case role_string
     when "ars", "auraseer", "aura_seer"
@@ -540,7 +542,7 @@ class Player
   def troublemaker?
     self.role == :troublemaker
   end
-
+  
   def villager?
     self.role == :villager
   end
@@ -554,13 +556,13 @@ class Player
   end
 
   def witch?
-    self.role == :werewolf
+    self.role == :witch
   end
 
-  def wolf?
+  def wolf?#doppelwolf counts as a wolf, 
     WOLF_ROLES.any?{ |role| role == self.role }
   end
-
+  
   def good?
     GOOD_ROLES.any?{ |role| role == self.role }
   end
@@ -584,6 +586,11 @@ class Player
   def role?(role)
     self.role == role
   end
+
+  #def no_pi_role?(role)
+  #  self.pi_role.nil?
+  #  #self.pi_role == :werewolf || self.pi_role == :tanner
+  #end
 
   def dg_role?(role)
 #    if self.doppelganger?
