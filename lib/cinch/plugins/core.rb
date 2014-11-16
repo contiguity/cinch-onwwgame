@@ -9,7 +9,7 @@ $player_count = 0
 
 class Game
 
-  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent, :pi_role, :dg_pi_role
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent, :force_roles
 
   def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
@@ -24,8 +24,7 @@ class Game
     self.subphase        = 1
     self.lynch_votes     = {}
     self.claims          = {}
-    self.dg_pi_role      = nil
-    self.pi_role      = nil    
+    self.force_roles     = []
   end
 
   #----------------------------------------------
@@ -152,7 +151,7 @@ class Game
   end
 
   # Shuffle the deck, pass out roles
-  #
+  # Force roles assumes roles were shuffled already in start_game
   def pass_out_roles
     # assign loyalties
     if self.ultimate?
@@ -162,13 +161,22 @@ class Game
       gameroles = BASE_ROLES + [:villager]*extra_players
     end
     alpha_wolf = gameroles.include?(:alpha_wolf)
+
     gameroles.shuffle!
+    game_force_roles = self.force_roles.dup
     self.players.each do |player|
-      role = gameroles.shift
+      if game_force_roles.empty?
+        role = gameroles.shift
+      else
+        role = game_force_roles.shift
+        if gameroles.include?(role)
+          gameroles.delete_at(gameroles.index(role))
+        end
+      end
       self.player_cards << role
       player.receive_role( role )
     end
-    self.table_cards = gameroles
+    self.table_cards = gameroles.take(3)
     if (alpha_wolf)
       # TODO: add extra wolf for alpha wolf
     end
@@ -535,6 +543,7 @@ class Player
     self.role == :tanner
   end
 
+
   def thief?
     self.role == :thief
   end
@@ -559,7 +568,7 @@ class Player
     self.role == :witch
   end
 
-  def wolf?#doppelwolf counts as a wolf, 
+  def wolf?#doppelwolf counts as a wolf here
     WOLF_ROLES.any?{ |role| role == self.role }
   end
   
@@ -602,5 +611,15 @@ class Player
 
   def old_doppelganger?
     !self.doppelganger_look.nil?
+  end
+    
+  def pi_role_as_text
+    if self.role?(:pi_werewolf)
+      "WEREWOLF" #return
+    elsif self.role?(:pi_tanner)
+      "TANNER" #return
+    else
+      "ROLE UNKNOWN" #return
+    end
   end
 end
