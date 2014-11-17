@@ -79,8 +79,8 @@ module Cinch
       match /noswitch/i,          :method => :troublemaker_noswitch
 
       # paranormal investigator
-      match /search (.+?) (.+?)/i, :method => :paranormal_investigator_search
-      match /search (.+?)/i,       :method => :paranormal_investigator_single_search
+      match /search (.+?) (.+)$/i, :method => :paranormal_investigator_search
+      #match /search ([^\s]+?)$/i,       :method => :paranormal_investigator_single_search
       match /nosearch/i,           :method => :paranormal_investigator_nosearch
 
       # doppelganger
@@ -587,11 +587,13 @@ module Cinch
         end
       end
       
-      def paranormal_investigator_search(m, target_player1, target_player2)
+      def paranormal_investigator_search(m, target_name1, target_name2)
         #happens before paranormal investigator changes to a different role
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
           if(player.paranormal_investigator? || (player.doppelganger? && player.cur_role== :paranormal_investigator))
+            target_player1=@game.find_player(target_name1)
+            target_player2=@game.find_player(target_name2)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             elsif target_player1.nil? || target_player2.nil?
@@ -599,7 +601,8 @@ module Cinch
             elsif target_player1 == player || target_player2 == player
               User(m.user).send "You cannot search yourself"
             else
-              player.action_take = {:paranomalinvestigatorsearch => [target_player1,target_player2]}
+
+              player.action_take = {:paranormalinvestigatorsearch => [target_player1,target_player2]}
               player.confirm_role
               User(m.user).send "Your action has been confirmed"
               self.check_for_day_phase
@@ -610,12 +613,12 @@ module Cinch
         end
       end
 
-      def paranormal_investigator_single_search(m, target_player1)
-        #this is similar to search, but takes in one player, however it saves with the same action
+      def paranormal_investigator_single_search(m, target_name1)
         #happens before paranormal investigator changes to a different role
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
           if(player.paranormal_investigator? || (player.doppelganger? && player.cur_role== :paranormal_investigator))
+            target_player1=@game.find_player(target_name1)
             if player.confirmed?
               User(m.user).send "You have already confirmed your action."
             elsif target_player1.nil?
@@ -623,7 +626,7 @@ module Cinch
             elsif target_player1 == player
               User(m.user).send "You cannot search yourself"
             else
-              player.action_take = {:paranomalinvestigatorsearch => [target_player1]}
+              player.action_take = {:paranormalinvestigatorsearch => [target_player1]}
               player.confirm_role
               User(m.user).send "Your action has been confirmed"
               self.check_for_day_phase
@@ -651,6 +654,8 @@ module Cinch
           else
             User(m.user).send "You are not the PARANORMAL INVESTIGATOR."
           end
+        else
+            User(m.user).send "Can't use this command at this time"
         end
       end
           
@@ -1007,22 +1012,30 @@ module Cinch
           when :paranormal_investigator
             if player.action_take.has_key?(:paranormalinvestigatorsearch)
               players_searched=player.action_take[:paranormalinvestigatorsearch]
+              #User(player.user).send "Searching "+players_searched.join(", ")
               night_msg="You view "
               players_searched.each do |target_player|
-                if(player.cur_role == :paranormal_investigator)#only continue searching if still PI
+                if(player.cur_role==:paranormal_investigator)#only continue searching if still PI
+                  #User(player.user).send "Search/check #{target_player}"                
                   night_msg+="#{role_as_text(target_player.cur_role)} and "
-                  if(target.wolf?)#can't see doppelganger
+                  #User(player.user).send night_msg
+                  if(target_player.wolf?)#no check for doppelganger
                     player.cur_role = :pi_werewolf
-                    night_msg+="become a WOLF"
-                  elsif(target.tanner?)#can't see doppelganger
+                    night_msg+="are now a WOLF"
+                    player.action_take[:pi_became]=:wolf
+                  elsif(target_player.tanner?)#no check for doppelganger
                     player.cur_role = :pi_tanner
-                    night_msg+="become a TANNER"
+                    night_msg+="are now a TANNER"
+                    player.action_take[:pi_became]=:tanner
                   end
                 end
               end
-              if(player.cur_role==:paranormal_investigator)
+              if(player.cur_role == :paranormal_investigator)
                 night_msg+="remain PARANORMAL INVESTIGATOR"
               end
+              User(player.user).send night_msg          
+            elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
+              User(player.user).send "You look at no one"
             end
           when :robber
             if player.action_take.has_key?(:thiefnone)
@@ -1056,7 +1069,7 @@ module Cinch
         end
         ###end doppelganger actions
 
-        Channel(@channel_name).send("Finished looking for doppelganger")
+        #Channel(@channel_name).send("Finished looking for doppelganger")
 
 
         ###Wolf reveal, minion reveal...
@@ -1115,28 +1128,40 @@ module Cinch
           User(player.user).send "One of the middle cards is: #{role_as_text(player.action_take[:apprentice_seer])}."
         end
 
+        Channel(@channel_name).send("Looking for paranormal investigator")
         player = @game.find_player_by_role(:paranormal_investigator)
         unless player.nil?
-          
+          #unless player.action_take.nil?
+          #  User(player.user).send "You took action "+player.action_take.keys.join(", ")
+          #end
           if player.action_take.has_key?(:paranormalinvestigatorsearch)
             players_searched=player.action_take[:paranormalinvestigatorsearch]
+            #User(player.user).send "Searching "+players_searched.join(", ")
             night_msg="You view "
             players_searched.each do |target_player|
               if(player.cur_role==:paranormal_investigator)#only continue searching if still PI
-                night_msg+="#{role_as_text(target_player)} and "
-                if(target.wolf? && !target.old_doppelganger?)#paranormal investigator doesn't switch roles
-                  player.cur_role = :werewolf
+                #User(player.user).send "Search/check #{target_player}"                
+                night_msg+="#{role_as_text(target_player.cur_role)} and "
+                #User(player.user).send night_msg
+                if(target_player.wolf? && !target_player.old_doppelganger?)#paranormal investigator doesn't switch roles
+                  player.cur_role = :pi_werewolf
                   night_msg+="are now a WOLF"
-                elsif(target.tanner? !target.old_doppelganger?)#paranormal investigator doesn't switch roles
-                  player.cur_role = :tanner
+                  player.action_take[:pi_became]=:wolf
+                elsif(target_player.tanner? && !target_player.old_doppelganger?)#paranormal investigator doesn't switch roles
+                  player.cur_role = :pi_tanner
                   night_msg+="are now a TANNER"
+                  player.action_take[:pi_became]=:tanner
                 end
               end
             end
             if(player.cur_role == :paranormal_investigator)
               night_msg+="remain PARANORMAL INVESTIGATOR"
             end
-          end          
+            User(player.user).send night_msg          
+          elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
+            User(player.user).send "You look at no one"
+          end
+          #User(player.user).send "Done searching for info"            
         end
 
         if @game.ultimate?
@@ -1150,7 +1175,8 @@ module Cinch
           elsif player.action_take.has_key?(:thiefplayer)
             target_player = player.action_take[:thiefplayer]
             player.action_take[:thiefplayerrole] = target_player.cur_role
-            User(player.user).send "You are now a #{role_as_text(player.action_take[:thiefplayer])}."
+            User(player.user).send "You are now a #{role_as_text(player.action_take[:thiefplayer].cur_role)}."
+            #User(player.user).send "---You take a role"
             player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
           elsif player.action_take.has_key?(:thieftable)
             new_thief = @game.table_cards.shuffle.first
@@ -1236,7 +1262,7 @@ module Cinch
             if player.action_take.has_key?(:mysticwolfplayer)
               Channel(@channel_name).send "DOPPLEGANGER-MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
             elsif player.action_take.has_key?(:paranormalinvestigatorsearch)              
-              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.pi_role_as_text}"
+              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became]}"
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
             elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at no one}"
@@ -1273,10 +1299,10 @@ module Cinch
         player = @game.find_player_by_role(:paranormal_investigator)
         unless player.nil?
           if player.action_take.has_key?(:paranormalinvestigatorsearch)
-              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.pi_role_as_text}"
+              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became].upcase}"
               Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
           elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
-              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at no one}"
+              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at no one"
           end
         end
 
@@ -1880,7 +1906,7 @@ module Cinch
 
         changelog
       end
-            
+
       def role_as_text(input_role)
         if input_role==:pi_werewolf || input_role==:pi_tanner
           return "PARANORMAL_INVESTIGATOR"
