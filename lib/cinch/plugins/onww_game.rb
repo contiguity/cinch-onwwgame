@@ -80,7 +80,7 @@ module Cinch
 
       # paranormal investigator
       match /search (.+?) (.+)$/i, :method => :paranormal_investigator_search
-      #match /search ([^\s]+?)$/i,       :method => :paranormal_investigator_single_search
+      match /search ([^\s]+?)$/i,       :method => :paranormal_investigator_single_search
       match /nosearch/i,           :method => :paranormal_investigator_nosearch
 
       # doppelganger
@@ -983,12 +983,13 @@ module Cinch
       end
 
       def night_reveal
-        Channel(@channel_name).send("Looking for doppelganger")
+        Channel(@channel_name).send "Looking for doppelganger"
         artifacts = ARTIFACTS.keys.shuffle
         unless @game.old_doppelganger.nil?
         ###Doppelganger actions
           player = @game.old_doppelganger
           player.cur_role = player.role
+          Channel(@channel_name).send "---Player #{player} is a #{player.cur_role} and copied #{@game.doppelganger_role}"
           case @game.doppelganger_role
           when :mystic_wolf
             User(player.user).send "#{player.action_take[:mysticwolfplayer]} is #{role_as_text(player.action_take[:mysticwolfplayer].cur_role)}"
@@ -1010,33 +1011,36 @@ module Cinch
             player.action_take[:apprentice_seer] = @game.table_cards.shuffle.first
             User(player.user).send "One of the middle cards is: #{role_as_text(player.action_take[:apprentice_seer])}."
           when :paranormal_investigator
+            User(player.user).send "You are a #{player.cur_role} and saw #{player.doppelganger_look[:dgrole]} and are searching..."
             if player.action_take.has_key?(:paranormalinvestigatorsearch)
               players_searched=player.action_take[:paranormalinvestigatorsearch]
-              #User(player.user).send "Searching "+players_searched.join(", ")
+              User(player.user).send "Searching "+players_searched.join(", ")
               night_msg="You view "
               players_searched.each do |target_player|
-                if(player.cur_role==:paranormal_investigator)#only continue searching if still PI
-                  #User(player.user).send "Search/check #{target_player}"                
+                #here, doppelganger_look represents what role the doppleganger is now, rather than what role they looked at
+                if(player.doppelganger_look[:dgrole]==:paranormal_investigator)#only continue searching if still PI
+                  User(player.user).send "Search/check #{target_player}"                
                   night_msg+="#{role_as_text(target_player.cur_role)} and "
-                  #User(player.user).send night_msg
+                  User(player.user).send night_msg
                   if(target_player.wolf?)#no check for doppelganger
-                    player.cur_role = :pi_werewolf
+                    player.doppelganger_look[:dgrole] = :pi_werewolf
                     night_msg+="are now a WOLF"
                     player.action_take[:pi_became]=:wolf
                   elsif(target_player.tanner?)#no check for doppelganger
-                    player.cur_role = :pi_tanner
+                    player.doppelganger_look[:dgrole] = :pi_tanner
                     night_msg+="are now a TANNER"
                     player.action_take[:pi_became]=:tanner
                   end
                 end
               end
-              if(player.cur_role == :paranormal_investigator)
+              if(player.doppelganger_look[:dgrole] == :paranormal_investigator)
                 night_msg+="remain PARANORMAL INVESTIGATOR"
               end
               User(player.user).send night_msg          
             elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
               User(player.user).send "You look at no one"
             end
+            User(player.user).send "After searching, you are a #{player.doppelganger_look[:dgrole]}"
           when :robber
             if player.action_take.has_key?(:thiefnone)
               User(player.user).send "You remain the #{player.role.upcase}"
@@ -1257,12 +1261,12 @@ module Cinch
         # need to turn this into repeatable functions
         player = @game.old_doppelganger
         unless player.nil?
-          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look[:dglook]} and became #{player.doppelganger_look[:dgrole].upcase}"
+          Channel(@channel_name).send "DOPPELGANGER looked at #{player.doppelganger_look[:dglook]} and became #{role_as_text(player.doppelganger_look[:dgrole])}"#shows role as they saw it
           unless player.action_take.nil?
             if player.action_take.has_key?(:mysticwolfplayer)
               Channel(@channel_name).send "DOPPLEGANGER-MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
             elsif player.action_take.has_key?(:paranormalinvestigatorsearch)              
-              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became]}"
+              pi_result_msg=player.doppelganger_look[:dgrole]==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became].upcase}"
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
             elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at no one}"
