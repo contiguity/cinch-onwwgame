@@ -117,7 +117,7 @@ module Cinch
       match /replace (.+?) (.+)/i, :method => :replace_user
       match /kick (.+)/i,          :method => :kick_user
       match /room (.+)/i,          :method => :room_mode
-      match /roles$/i,             :method => :what_roles
+      match /roles$/i,             :method => :what_roles#can we remove this?
 
       listen_to :join,          :method => :voice_if_in_game
       listen_to :leaving,       :method => :remove_if_not_started
@@ -209,8 +209,10 @@ module Cinch
           User(m.user).send "6~7 players: 2 werewolves, 4 villagers, 1 seer, 1 thief"
         when "nightorder"
           User(m.user).send "1: Doppelganger, 2: Werewolves, 3: Minion, 4: Masons, 5: Seer, 5b: Apprentice Seer, 6: Robber, 7: Troublemaker, 8: Drunk, 9: Insomniac, 9a: Doppelganger/Insomniac, 11: Curator"
+        when "completenightorder"
+          User(m.user).send "0: Sentinel, 1: Doppelganger, 2: Werewolves, 2-B: Alpha Wolf, 2-C: Mystic Wolf, 3: Minion, 4: Mason, 5: Seer, 5-B: Apprentice Seer, 5-C: Paranormal Investigator, 6: Robber, 6-B: Witch, 7: Troublemaker, 7-B: Village Idiot, 7-C: Aura Seer, 8: Drunk, 9: Insomniac, 10: Revealer, 11: Curator"
         when "onuwwroles"
-          User(m.user).send "INSERT ONUWW ROLES HERE!"
+          User(m.user).send "Use !nightorder or !completenightorder for role names"
         else
           User(m.user).send "One Night Werewolf is based on the party game \"Are you a werewolf?\'. In One Night Werewolf, there is a single night phase and a single day phase.  Just as in Werewolf, players are dealt roles which are kept hidden for the duration of the game.  There are always two more roles than the number of players.  During the night phase, the seer and thief (if in play) can use their abilities in order."
           User(m.user).send "First, the werewolves reveal to each other, or learn that they are the only one currently in play.  Next, the seer can either look at ONE player's role or look at the two remaining roles on the table. Finally, the thief can then choose to either exchange roles with another player, exchange roles with one of the remaining roles from the table, or not at all.  If the thief exchanges with another player, the chosen player does not know if their role was exchanged or not."
@@ -396,7 +398,8 @@ module Cinch
         if @game.ultimate?
           with_variants = @game.variants.empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
           roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}"
-          Channel(@channel_name).send "Using #{self.game_settings[:roles].count} #{roles_msg}.#{with_variants}" 
+          force_roles_msg = @game.force_roles.empty? ? "" : "Using non-middle roles #{@game.force_roles.join(", ")}."
+          Channel(@channel_name).send "Using #{self.game_settings[:roles].count} #{roles_msg}.#{force_roles_msg}#{with_variants}" 
           Channel(@channel_name).send "Players: #{@game.players.map(&:user).join(", ")}"
         end
 
@@ -692,9 +695,9 @@ module Cinch
               User(m.user).send "You have already confirmed your action."
             else
               if @game.ultimate?
-                player.action_take = {:seertable => @game.table_cards.shuffle.first(2).map(&:upcase).join(" and ")}
+                player.action_take = {:seertable => @game.table_cards.shuffle.first(2)}
               else
-                player.action_take = {:seertable => @game.table_cards.map(&:upcase).join(" and ")}
+                player.action_take = {:seertable => @game.table_cards}
               end
               player.confirm_role
               User(m.user).send "Your action has been confirmed."
@@ -999,10 +1002,11 @@ module Cinch
             User(player.user).send reveal_msg
           when :seer
             if player.action_take.has_key?(:seerplayer)
-              User(player.user).send "#{player.action_take[:seerplayer]} is #{role_as_text(player.action_take[:seerplayer])}."
+              User(player.user).send "#{player.action_take[:seerplayer]} is #{role_as_text(player.action_take[:seerplayer].cur_role)}."
             elsif player.action_take.has_key?(:seertable)
               if @game.ultimate?
-                User(player.user).send "Two of the middle cards are: #{player.action_take[:seertable].map(&:role_as_text)}."
+                seer_msg=player.action_take[:seertable].collect {|role| role_as_text(role)}.join(" and ")
+                User(player.user).send "Two of the middle cards are: #{seer_msg}."
               else
                 User(player.user).send "Middle is #{role_as_text(player.action_take[:seertable])}."
               end
@@ -1119,7 +1123,8 @@ module Cinch
             User(player.user).send "#{player.action_take[:seerplayer]} is #{role_as_text(player.action_take[:seerplayer].cur_role)}."
           elsif player.action_take.has_key?(:seertable)
             if @game.ultimate?
-              User(player.user).send "Two of the middle cards are: #{player.action_take[:seertable].map(&:role_as_text)}."
+              seer_msg=player.action_take[:seertable].collect {|role| role_as_text(role)}.join(" and ")
+              User(player.user).send "Two of the middle cards are: #{seer_msg}."
             else
               User(player.user).send "Middle is #{role_as_text(player.action_take[:seertable])}."
             end
@@ -1165,7 +1170,15 @@ module Cinch
           elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
             User(player.user).send "You look at no one"
           end
-          #User(player.user).send "Done searching for info"            
+          if player.action_take.has_key?(:pi_became)
+            if player.action_take[:pi_became].nil?
+               User(player.user).send "Done searching for info -- Became empty"            
+            else
+               User(player.user).send "Done searching for info -- Became is #{player.action_take[:pi_became]}" 
+            end                         
+          else
+            User(player.user).send "Done searching for info -- Became doesn't exist"            
+          end
         end
 
         if @game.ultimate?
@@ -1207,7 +1220,8 @@ module Cinch
 
         unless @game.insomniacs.nil?
           @game.insomniacs.each do |p|
-            reveal_msg = p.cur_role == p.role ? "You are still the INSOMNIAC." : "You are now the #{role_as_text(p.cur_role)}."
+            insomniac_role=p.old_doppelganger? ? "DOPPELGANGER" : "INSOMNIAC"
+            reveal_msg = p.cur_role == p.role ? "You are still the #{insomniac_role}" : "You are now the #{role_as_text(p.cur_role)}."
             User(p.user).send reveal_msg
           end
         end
@@ -1266,16 +1280,17 @@ module Cinch
             if player.action_take.has_key?(:mysticwolfplayer)
               Channel(@channel_name).send "DOPPLEGANGER-MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
             elsif player.action_take.has_key?(:paranormalinvestigatorsearch)              
-              pi_result_msg=player.doppelganger_look[:dgrole]==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became].upcase}"
+              pi_result_msg=player.action_take.has_key?(:pi_became) ? "became a #{player.action_take[:pi_became].upcase}" : "remained the same"
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
             elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
               Channel(@channel_name).send "DOPPLEGANGER-PARANORMAL_INVESTIGATOR looked at no one}"
             elsif player.action_take.has_key?(:seerplayer)
               Channel(@channel_name).send "DOPPELGANGER-SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayer].role.upcase}"
             elsif player.action_take.has_key?(:seertable)
-              Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{player.action_take[:seertable]}"
+              seer_msg=player.action_take[:seertable].collect {|role| role_as_text(role)}.join(" and ")
+              Channel(@channel_name).send "DOPPELGANGER-SEER looked at the table and saw: #{seer_msg}"
             elsif player.action_take.has_key?(:apprentice_seer)
-              Channel(@channel_name).send "DOPPELGANGER-APPRENTICE_SEER looked at the table and saw #{player.action_take[:apprentice_seer]}"
+              Channel(@channel_name).send "DOPPELGANGER-APPRENTICE_SEER looked at the table and saw #{player.action_take[:apprentice_seer].upcase}"
             elsif player.action_take.has_key?(:thiefnone)
               Channel(@channel_name).send "DOPPELGANGER-ROBBER took from no one"
             elsif player.action_take.has_key?(:thiefplayer)
@@ -1300,28 +1315,28 @@ module Cinch
           Channel(@channel_name).send "MYSTIC_WOLF looked at #{player.action_take[:mysticwolfplayer]} and saw: #{player.action_take[:mysticwolfplayer].role.upcase}"
         end
 
-        player = @game.find_player_by_role(:paranormal_investigator)
-        unless player.nil?
-          if player.action_take.has_key?(:paranormalinvestigatorsearch)
-              pi_result_msg=player.cur_role==:paranormal_investigator ? "remained the same":"became a #{player.action_take[:pi_became].upcase}"
-              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
-          elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
-              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at no one"
-          end
-        end
-
         player = @game.find_player_by_role(:seer)
         unless player.nil?
           if player.action_take.has_key?(:seerplayer)
             Channel(@channel_name).send "SEER looked at #{player.action_take[:seerplayer]} and saw: #{player.action_take[:seerplayerrole].upcase}"
           elsif player.action_take.has_key?(:seertable)
-            Channel(@channel_name).send "SEER looked at the table and saw: #{player.action_take[:seertable]}"
+            Channel(@channel_name).send "SEER looked at the table and saw: #{player.action_take[:seertable].map(&:upcase).join(" and ")}"
           end
         end
 
         player = @game.find_player_by_role(:apprentice_seer)
         unless player.nil?
           Channel(@channel_name).send "APPRENTICE_SEER looked at the table and saw #{player.action_take[:apprentice_seer].upcase}"
+        end
+
+        player = @game.find_player_by_role(:paranormal_investigator)
+        unless player.nil?
+          if player.action_take.has_key?(:paranormalinvestigatorsearch)
+              pi_result_msg=player.action_take.has_key?(:pi_became) ? "became a #{player.action_take[:pi_became].upcase}" : "remained the same"
+              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at #{player.action_take[:paranormalinvestigatorsearch].join(" and ")} and #{pi_result_msg}"
+          elsif player.action_take.has_key?(:paranormalinvestigatornosearch)
+              Channel(@channel_name).send "PARANORMAL_INVESTIGATOR looked at no one"
+          end
         end
 
         player = @game.find_player_by_role(:thief)
@@ -1870,9 +1885,11 @@ module Cinch
       def get_game_roles(m)
         roles_msg = @game.variants.include?(:blindrandom) ? "unknown roles" : "roles: #{self.game_settings[:roles].sort.join(", ")}" 
         game_type_message = "Using #{self.game_settings[:roles].count} #{roles_msg}."
+        force_roles_msg = @game.force_roles.empty? ? "" : "Using non-middle roles #{@game.foce_roles.join(", ")}."
           
         with_variants = self.game_settings[:variants].empty? ? "" : " Using variants: #{self.game_settings[:variants].join(", ")}."
-         m.reply "#{game_type_message}#{with_variants}"
+         m.reply "#{game_type_message}#{force_roles_msg}#{with_variants}"
+
       end
 
       def game_settings
