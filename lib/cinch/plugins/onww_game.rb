@@ -70,6 +70,10 @@ module Cinch
       match /rob (.+)/i,          :method => :thief_take_player
       match /norob/i,             :method => :thief_take_none
 
+      # witch
+      match /craft (/+)/i,        :method => :witch_craft
+      match /nocraft/i,           :method => :witch_nocraft
+
       # curator
       match /gift (.+)/i,         :method => :curator_gift_player
       match /nogift/i,       :method => :curator_gift_none
@@ -754,6 +758,26 @@ module Cinch
         end
       end
 
+      def witch_craft(m, target)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+
+          if (player.witch? || (player.doppelganger? && player.cur_role == :witch))
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            elsif target_player.nil?
+              User(m.user).send "\"#{stolen}\" is an invalid target."
+            elsif target_player == player
+              User(m.user).send "You cannot steal from yourself."
+            else
+              player.action_take = {:witchcrafttarget => player}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed."
+              self.check_for_day_phase
+            end
+
+
+
       def thief_take_table(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
           player = @game.find_player(m.user)
@@ -943,6 +967,13 @@ module Cinch
           loyalty_msg = "You are the THIEF. Do you want to take a role? \"!thief [player]\", \"!tablethief\" or \"!nothief\""
         when :robber
           loyalty_msg = "You are the ROBBER. Do you want to take a role? \"!rob [player]\" or \"!norob\""
+        when :witch
+          if (player.old_doppelganger?)
+            witch_view=role_as_text(@game.table_cards[0]) #Left card
+          else
+            witch_view=role_as_text(@game.table_cards[2]) #right card
+          end
+          loyalty_msg = "You are the WITCH. You see #{witch_view}. Do you want to give a player this role? \"!craft [player]\" or \"!nocraft\""
         when :curator
           if (player.old_doppelganger?)
             curator = player.doppelganger_look[:dglook]
@@ -1054,6 +1085,10 @@ module Cinch
               player.cur_role,target_player.cur_role = target_player.cur_role,player.cur_role
               User(player.user).send "You are now a #{role_as_text(player.action_take[:thiefplayer].role)}."
             end
+          when :witch
+            if player.action_take.haskey?(:witchnocraft)
+              User(player.user).send "You do not switch anyone"
+            if player.action_take.haskey?(:witchcraft)
           when :troublemaker
             if player.action_take.has_key?(:troublemakerplayer)
               player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
