@@ -779,10 +779,28 @@ module Cinch
           else
             User(m.user).send "You are not the WITCH."
           end
+          User(m.user).send "Actions taken look like #{player.action_take}" #|
         end
 
       end
 
+      def witch_nocraft(m)
+        if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
+          player = @game.find_player(m.user)
+          if (player.witch? || (player.doppelganger? && player.cur_role == :witch))
+            if player.confirmed?
+              User(m.user).send "You have already confirmed your action."
+            else
+              player.action_take = {:nocraft => "none"}
+              player.confirm_role
+              User(m.user).send "Your action has been confirmed"
+              self.check_for_day_phase
+            end
+          else
+            User(m.user).send "You are not the WITCH."
+          end
+        end
+      end
 
       def thief_take_table(m)
         if @game.started? && @game.waiting_on_role_confirm && @game.has_player?(m.user)
@@ -1086,19 +1104,20 @@ module Cinch
               User(player.user).send "You are now a #{role_as_text(player.action_take[:thiefplayer].role)}."
             end
           when :witch
-            if player.action_take.haskey?(:nocraft)
+            if player.action_take.has_key?(:nocraft)
               User(player.user).send "You do not switch anyone"
             else
-              role_num=rand(table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
+              role_num=rand(@game.table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
               witch_role=@game.table_cards[role_num]
               target_player=nil
-              if player.action_take.haskey?(:crafttargetgood) && (witch_role.good? || witch_role.tanner?)
+              if player.action_take.has_key?(:crafttargetgood) && (GOOD_ROLES.include?(witch_role) || witch_role ==:tanner)
                 target_player=player.action_take[:crafttargetgood]#player to craft
-              elsif player.action_take.haskey?(:crafttargetbad) && witch_role.evil?
+              elsif player.action_take.has_key?(:crafttargetbad) && (EVIL_ROLES.include?(witch_role))
                 target_player=player.action_take[:crafttargetbad]#player to craft
               end
               if target_player.nil?
                 User(player.user).send "Switch unsuccessful. Please note game state."
+                player.action_take = {:nocraft => "none"}
               else
                 target_player.cur_role,@game.table_cards[role_num] = @game.table_cards[role_num],target_player.cur_role
                 player.action_take[:craftrole]=witch_role
@@ -1112,7 +1131,7 @@ module Cinch
               player.action_take[:troublemakerplayer][0].cur_role,player.action_take[:troublemakerplayer][1].cur_role = player.action_take[:troublemakerplayer][1].cur_role,player.action_take[:troublemakerplayer][0].cur_role
             end
           when :drunk
-            role_num=rand(table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
+            role_num=rand(@game.table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
             newrole = @game.table_cards[role_num]
             @game.table_cards[role_num]=:doppelganger
             player.cur_role = newrole
@@ -1138,8 +1157,10 @@ module Cinch
         unless @game.waking_wolves.nil?
           @game.waking_wolves.each do |p|
             other_wolf = @game.wolves.reject{ |w| w == p }
-            reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
-            User(p.user).send reveal_msg
+            unless p.mystic_wolf?
+              reveal_msg = other_wolf.empty? ? "You are a lone wolf." : "You look for other werewolves and see: #{other_wolf.join(", ")}."
+              User(p.user).send reveal_msg
+            end
             if (other_wolf.empty? && @game.with_variant?(:lonewolf))
               p.action_take = {:lonewolf => @game.table_cards.shuffle.first }
               User(p.user).send "LONE WOLF: You see #{role_as_text(p.action_take[:lonewolf])} in the middle"
@@ -1259,19 +1280,21 @@ module Cinch
         
         player = @game.find_player_by_role(:witch)
         unless player.nil?
-          if player.action_take.haskey?(:nocraft)
+          if player.action_take.has_key?(:nocraft)
             User(player.user).send "You do not switch anyone"
           else
-            role_num=rand(table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
+            role_num=rand(@game.table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
             witch_role=@game.table_cards[role_num]
+            User(player.user).send "-- Actions taken look like #{player.action_take}" #|
             target_player=nil
-            if player.action_take.haskey?(:crafttargetgood) && (witch_role.good? || witch_role.tanner?)
+            if player.action_take.has_key?(:crafttargetgood) && (GOOD_ROLES.include?(witch_role) || witch_role ==:tanner)
               target_player=player.action_take[:crafttargetgood]#player to craft
-            elsif player.action_take.haskey?(:crafttargetbad) && witch_role.evil?
+            elsif player.action_take.has_key?(:crafttargetbad) && (EVIL_ROLES.include?(witch_role))
               target_player=player.action_take[:crafttargetbad]#player to craft
             end
             if target_player.nil?
               User(player.user).send "Switch unsuccessful. Please note game state."
+              player.action_take = {:nocraft => "none"}
             else
               target_player.cur_role,@game.table_cards[role_num] = @game.table_cards[role_num],target_player.cur_role
               player.action_take[:craftrole]=witch_role
@@ -1374,7 +1397,7 @@ module Cinch
             elsif player.action_take.has_key?(:thiefplayer)
               Channel(@channel_name).send "DOPPELGANGER-ROBBER took: #{player.action_take[:thiefplayer].role.upcase} from #{player.action_take[:thiefplayer]}"
             elsif player.action_take.has_key?(:crafttarget)
-              Channel(@channel_name).send "DOPPELGANGER-WITCH gave #{player.action_take[:craftrole].role.upcase} to #{player.action_take[:crafttarget]}"
+              Channel(@channel_name).send "DOPPELGANGER-WITCH gave #{player.action_take[:craftrole].upcase} to #{player.action_take[:crafttarget]}"
             elsif player.action_take.has_key?(:nocraft)
               Channel(@channel_name).send "DOPPELGANGER-WITCH did not look and gave to no one"
             elsif player.action_take.has_key?(:troublemakernone)
@@ -1448,7 +1471,7 @@ module Cinch
         player = @game.find_player_by_role(:witch)
         unless player.nil?
           if player.action_take.has_key?(:crafttarget)
-            Channel(@channel_name).send "WITCH gave #{player.action_take[:craftrole].role.upcase} to #{player.action_take[:crafttarget]}"
+            Channel(@channel_name).send "WITCH gave #{player.action_take[:craftrole].upcase} to #{player.action_take[:crafttarget]}"
           elsif player.action_take.has_key?(:nocraft)
             Channel(@channel_name).send "WITCH did not look and gave to no one"
           end

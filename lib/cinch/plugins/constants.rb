@@ -5,7 +5,7 @@ ONUWW_MAX_PLAYERS = 10
 BASE_ROLES = [:werewolf, :werewolf, :seer, :thief, :villager]
 DEFAULT_ULTIMATE_ROLES = [:werewolf, :werewolf, :seer, :robber, :troublemaker, :villager]
 
-GOOD_ROLES = [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger, :apprentice_seer, :curator, :cursed, :paranormal_investigator]
+GOOD_ROLES = [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger, :apprentice_seer, :curator, :cursed, :paranormal_investigator, :witch ]
 WOLF_ROLES = [:werewolf, :dream_wolf, :mystic_wolf, :alpha_wolf, :pi_wolf]
 EVIL_ROLES = WOLF_ROLES + [:minion]
 NON_SPECIALS = [:werewolf, :villager, :tanner, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :minion, :apprentice_seer, :cursed, :dream_wolf]
@@ -44,5 +44,5 @@ ROLE_COUNTS = {
 	:troublemaker => [0, 1],
 	:village_idiot => [0], # NYI
 	:werewolf => [*0..3], #Includes a fun new pose
-	:witch => [0] # NYI
+	:witch => [0, 1] # newly implemented
 }

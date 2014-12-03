@@ -301,8 +301,8 @@ class Game
     self.players.select{ |p| p.wolf? || WOLF_ROLES.any?{ |role| p.dg_role?(role) } }
   end
 
-  def waking_wolves #mystic wolf is given wolf info during night action (so can view a non-wolf if desired)
-    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) || p.mystic_wolf? || p.dg_role?(:mystic_wolf) }
+  def waking_wolves #mystic wolf is a waking wolf, but given some wolf info during information
+    self.wolves.reject{ |p| p.dream_wolf? || p.dg_role?(:dream_wolf) }
   end
 
   def humans
