@@ -779,7 +779,7 @@ module Cinch
           else
             User(m.user).send "You are not the WITCH."
           end
-          User(m.user).send "Actions taken look like #{player.action_take}" #|
+          #User(m.user).send "Actions taken look like #{player.action_take}" #|
         end
 
       end
@@ -1109,6 +1109,7 @@ module Cinch
             else
               role_num=rand(@game.table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
               witch_role=@game.table_cards[role_num]
+              #User(player.user).send "Chose number #{role_num}"
               target_player=nil
               if player.action_take.has_key?(:crafttargetgood) && (GOOD_ROLES.include?(witch_role) || witch_role ==:tanner)
                 target_player=player.action_take[:crafttargetgood]#player to craft
@@ -1284,8 +1285,9 @@ module Cinch
             User(player.user).send "You do not switch anyone"
           else
             role_num=rand(@game.table_cards.length)#0 1 2 [or 0 1 2 3 with alpha_wolf]
+            #User(player.user).send "Chose number #{role_num}"
             witch_role=@game.table_cards[role_num]
-            User(player.user).send "-- Actions taken look like #{player.action_take}" #|
+            #User(player.user).send "-- Actions taken look like #{player.action_take}" #|
             target_player=nil
             if player.action_take.has_key?(:crafttargetgood) && (GOOD_ROLES.include?(witch_role) || witch_role ==:tanner)
               target_player=player.action_take[:crafttargetgood]#player to craft
@@ -1370,7 +1372,7 @@ module Cinch
           end
         end.join(', ')
         Channel(@channel_name).send "Starting Roles: #{roles_msg}"
-        Channel(@channel_name).send "Middle Cards: #{@game.table_cards.map(&:upcase).join(', ')}"
+        Channel(@channel_name).send "Middle Cards: #{@game.start_table_cards.map(&:upcase).join(', ')}"
 
         # now reveal night actions
         # need to turn this into repeatable functions

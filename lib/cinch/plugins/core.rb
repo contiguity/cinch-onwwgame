@@ -9,7 +9,7 @@ $player_count = 0
 
 class Game
 
-  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :lynch_votes, :claims, :invitation_sent, :force_roles
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :start_table_cards, :lynch_votes, :claims, :invitation_sent, :force_roles
 
   def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
@@ -20,6 +20,7 @@ class Game
     self.invitation_sent = false
     self.player_cards    = []
     self.table_cards     = []
+    self.start_table_cards=[]
     self.phase           = :night # starts on night phase
     self.subphase        = 1
     self.lynch_votes     = {}
@@ -177,6 +178,7 @@ class Game
       player.receive_role( role )
     end
     self.table_cards = gameroles.take(3)
+    self.start_table_cards = table_cards.clone
     if (alpha_wolf)
       # TODO: add extra wolf for alpha wolf
     end
