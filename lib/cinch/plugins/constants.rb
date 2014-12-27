@@ -5,12 +5,12 @@ ONUWW_MAX_PLAYERS = 10
 BASE_ROLES = [:werewolf, :werewolf, :seer, :thief, :villager]
 DEFAULT_ULTIMATE_ROLES = [:werewolf, :werewolf, :seer, :robber, :troublemaker, :villager]
 
-GOOD_ROLES = [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger, :apprentice_seer, :curator, :cursed, :paranormal_investigator, :witch ]
+GOOD_ROLES = [:seer, :thief, :villager, :robber, :troublemaker, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :doppelganger, :apprentice_seer, :curator, :cursed, :paranormal_investigator, :witch, :revealer]
 WOLF_ROLES = [:werewolf, :dream_wolf, :mystic_wolf, :alpha_wolf, :pi_wolf]
 EVIL_ROLES = WOLF_ROLES + [:minion]
 NON_SPECIALS = [:werewolf, :villager, :tanner, :drunk, :hunter, :prince, :bodyguard, :mason, :insomniac, :minion, :apprentice_seer, :cursed, :dream_wolf]
 
-RANDOM_ROLES = [:villager, :villager, :villager, :villager, :werewolf, :werewolf, :seer, :robber, :troublemaker, :tanner, :drunk, :hunter, :prince, :bodyguard, :apprentice_seer, :mason, :insomniac, :doppelganger, :mystic_wolf, :curator, :cursed, :paranormal_investigator]
+RANDOM_ROLES = [:villager, :villager, :villager, :villager, :werewolf, :werewolf, :seer, :robber, :troublemaker, :tanner, :drunk, :hunter, :prince, :bodyguard, :apprentice_seer, :mason, :insomniac, :doppelganger, :mystic_wolf, :curator, :cursed, :paranormal_investigator, :revealer]
 
 VALID_VARIANTS = ["lonewolf", "random", "blindrandom"]
 
@@ -35,7 +35,7 @@ ROLE_COUNTS = {
 	:mystic_wolf => [0,1],#newly implemented
 	:paranormal_investigator => [0, 1], #newly implemented
 	:prince => [*0..1],
-	:revealer => [0], # NYI
+	:revealer => [1], # Under testing
 	:robber => [0, 1],
 	:seer => [*0..1],
 	:sentinel => [0], # NYI

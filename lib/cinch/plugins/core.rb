@@ -9,7 +9,7 @@ $player_count = 0
 
 class Game
 
-  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :start_table_cards, :lynch_votes, :claims, :invitation_sent, :force_roles
+  attr_accessor :started, :phase, :subphase, :players, :type, :roles, :variants, :player_cards, :table_cards, :start_table_cards, :lynch_votes, :claims, :invitation_sent, :force_roles, :revealed_cards
 
   def initialize(init_roles = DEFAULT_ULTIMATE_ROLES)
     self.started         = false
@@ -26,6 +26,7 @@ class Game
     self.lynch_votes     = {}
     self.claims          = {}
     self.force_roles     = []
+    self.revealed_cards  = {}
   end
 
   #----------------------------------------------
